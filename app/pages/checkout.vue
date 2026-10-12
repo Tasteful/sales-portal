@@ -124,25 +124,43 @@ if (isCompanyUser.value && companyData.value) {
   checkoutStore.prefillFromCompany(companyData.value);
 }
 
-// Cart summary computeds (read from cart store — do NOT duplicate)
+// Cart summary computeds (read from cart store — do NOT duplicate). Each
+// amount is the side of the buyer's VAT choice; a missing one stays empty.
+const { showIncVat } = useVatDisplay();
+const cartSummary = computed(() => cartStore.cart?.summary);
 const subtotal = computed(
-  () => cartStore.cart?.summary?.subTotal?.sellingPriceIncVatFormatted ?? '',
+  () =>
+    (showIncVat.value
+      ? cartSummary.value?.subTotal?.sellingPriceIncVatFormatted
+      : cartSummary.value?.subTotal?.sellingPriceExVatFormatted) ?? '',
 );
 const shippingFee = computed(
-  () => cartStore.cart?.summary?.shipping?.feeIncVatFormatted || null,
+  () =>
+    (showIncVat.value
+      ? cartSummary.value?.shipping?.feeIncVatFormatted
+      : cartSummary.value?.shipping?.feeExVatFormatted) || null,
 );
-const tax = computed(
-  () => cartStore.cart?.summary?.total?.vatFormatted || null,
-);
+const tax = computed(() => cartSummary.value?.total?.vatFormatted || null);
 const total = computed(
-  () => cartStore.cart?.summary?.total?.sellingPriceIncVatFormatted ?? '',
+  () =>
+    (showIncVat.value
+      ? cartSummary.value?.total?.sellingPriceIncVatFormatted
+      : cartSummary.value?.total?.sellingPriceExVatFormatted) ?? '',
+);
+// The charge is inc VAT whichever side the buyer reads; never a 0.
+const toPayIncVat = computed(() =>
+  (cartSummary.value?.total?.sellingPriceIncVat ?? 0) > 0
+    ? cartSummary.value?.total?.sellingPriceIncVatFormatted || undefined
+    : undefined,
 );
 const discountFormatted = computed(() => {
-  if (!cartStore.discountAmount) return '';
-  const currency = cartStore.cart?.summary?.total?.currency;
+  const amount = showIncVat.value
+    ? cartSummary.value?.fixedAmountDiscountIncVat
+    : cartSummary.value?.fixedAmountDiscountExVat;
+  if (!amount) return '';
   return formatPrice(
-    cartStore.discountAmount,
-    currency?.code,
+    amount,
+    cartSummary.value?.total?.currency?.code,
     formatLocale.value,
   );
 });
@@ -496,6 +514,7 @@ async function handlePlaceOrder() {
                 :tax="tax"
                 :total="total"
                 :discount="discountFormatted || undefined"
+                :to-pay-inc-vat="toPayIncVat"
                 :can-place-order="
                   checkoutStore.canPlaceOrder &&
                   !checkoutStore.isBlacklisted &&

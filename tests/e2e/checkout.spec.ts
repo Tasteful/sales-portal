@@ -7,9 +7,13 @@ import {
   outOfScope,
   parsePrice,
   readPrice,
+  setVatDisplay,
   waitForHydration,
   signedInState,
+  type ApiCart,
+  type VatSide,
 } from './helpers';
+import { localeText } from './locale-text';
 
 /**
  * Checkout E2E Tests
@@ -20,12 +24,9 @@ import {
  * So this asserts that the cart the server computed survives to the final
  * screen, not that two computations agree.
  *
- * Inc-VAT, deliberately: the page reads `sellingPriceIncVatFormatted` and
- * passes `show-vat="true"` to every price, with no `useVatDisplay` anywhere in
- * it. The VAT toggle pinned checkout to inc-VAT in the same change that added
- * the toggle elsewhere, so a buyer on the ex-VAT default sees different numbers
- * here than on /cart. These tests assert the inc-VAT side and, where VAT is
- * non-zero, that the ex-VAT number is *not* what reached the screen.
+ * Every amount follows the buyer's VAT choice, as on /cart. Each test runs on
+ * both sides and asserts the side it set and, where VAT is non-zero, that the
+ * other side's number is *not* what reached the screen.
  *
  * Nothing here places an order: no test clicks the place-order button, and the
  * guard below fails any test that reaches an order-creating endpoint anyway.
@@ -89,7 +90,8 @@ test.describe('Checkout summary', () => {
    * from the store the cart plugin hydrates during SSR, so the wait is for the
    * summary itself rather than for the network.
    */
-  async function openCheckout(page: Page) {
+  async function openCheckout(page: Page, side: VatSide) {
+    await setVatDisplay(page, side);
     const product = await discoverPurchasableProduct(page);
     await addToCart(page, product.alias, QUANTITY);
 
@@ -115,22 +117,14 @@ test.describe('Checkout summary', () => {
 
   /**
    * Shipping has no number before an option is selected: `/api/cart` sends an
-   * empty fee string and the summary leaves the cell empty by design, so
-   * nothing on the last screen reads as a fee that was never quoted.
-   *
-   * The cell is asserted as present-and-numberless rather than visible: an
-   * element with no content has no box, which Playwright reports as hidden.
-   * The summary's other numbers are read on the same page, so this absence is
-   * never the whole of what the test saw.
+   * empty fee string and the summary says shipping may apply, so nothing on
+   * the last screen reads as a fee that was never quoted.
    */
   async function expectShippingMatches(cell: Locator, feeFormatted: string) {
     if (feeFormatted === '') {
-      await expect(cell).toHaveCount(1);
-      const text = ((await cell.textContent()) ?? '').trim();
-      expect(
-        /\d/.test(text),
-        `the API sent no shipping fee, so the cell must not show a number: ${JSON.stringify(text)}`,
-      ).toBe(false);
+      await expect(cell).toHaveText(
+        await localeText(cell.page(), 'common.shipping_may_apply'),
+      );
       return;
     }
 
@@ -138,70 +132,181 @@ test.describe('Checkout summary', () => {
     expect(await readPrice(cell)).toBeCloseTo(parsePrice(feeFormatted), 2);
   }
 
-  test('the summary shows the inc-VAT numbers /api/cart reports', async ({
+  /** The cart's amounts on one VAT side, and the other side's to deny. */
+  function sideOf(cart: ApiCart, side: VatSide) {
+    const inc = side === 'inc';
+    return {
+      subtotal: inc ? cart.subTotalIncVat : cart.subTotalExVat,
+      total: inc ? cart.totalIncVat : cart.totalExVat,
+      otherSubtotal: inc ? cart.subTotalExVat : cart.subTotalIncVat,
+      otherTotal: inc ? cart.totalExVat : cart.totalIncVat,
+      shippingFeeFormatted: inc
+        ? cart.shippingFeeFormatted
+        : cart.shippingFeeExVatFormatted,
+      discount: inc ? cart.discountIncVat : cart.discountExVat,
+    };
+  }
+
+  for (const side of ['ex', 'inc'] as const) {
+    test(`the summary shows the ${side}-VAT numbers /api/cart reports`, async ({
+      page,
+    }) => {
+      const cart = await openCheckout(page, side);
+      const expected = sideOf(cart, side);
+
+      const subtotal = await readPrice(
+        page.locator('[data-testid="checkout-summary-subtotal"]'),
+      );
+      const total = await readPrice(
+        page.locator('[data-testid="checkout-summary-total"]'),
+      );
+
+      expect(subtotal).toBeCloseTo(expected.subtotal, 2);
+      expect(total).toBeCloseTo(expected.total, 2);
+      // VAT is one number in both modes.
+      expect(
+        await readPrice(page.locator('[data-testid="checkout-summary-tax"]')),
+      ).toBeCloseTo(cart.vat, 2);
+
+      // The other side. Without this the test would pass just as well on a
+      // checkout that ignored the choice and showed one side always.
+      if (cart.vat > 0) {
+        expect(subtotal).not.toBeCloseTo(expected.otherSubtotal, 2);
+        expect(total).not.toBeCloseTo(expected.otherTotal, 2);
+      }
+
+      await expectShippingMatches(
+        page.locator('[data-testid="checkout-summary-shipping"]'),
+        expected.shippingFeeFormatted,
+      );
+    });
+
+    test(`each line shows the ${side}-VAT unit price and total`, async ({
+      page,
+    }) => {
+      const cart = await openCheckout(page, side);
+      const line = cart.items[0]!;
+      const inc = side === 'inc';
+      const unitExpected = inc ? line.unitPriceIncVat : line.unitPriceExVat;
+      const totalExpected = inc ? line.totalPriceIncVat : line.totalPriceExVat;
+      const unitOther = inc ? line.unitPriceExVat : line.unitPriceIncVat;
+
+      const item = page.locator('[data-testid="checkout-cart-item"]').first();
+      // The unit-price id sits on the paragraph that also carries the "/ unit"
+      // suffix. That text has no digits, so the price is the only number in it.
+      const unitPrice = await readPrice(
+        item.locator('[data-testid="checkout-unit-price"]'),
+      );
+      const lineTotal = await readPrice(
+        item.locator('[data-testid="checkout-line-total"]'),
+      );
+
+      expect(unitPrice).toBeCloseTo(unitExpected, 2);
+      expect(lineTotal).toBeCloseTo(totalExpected, 2);
+      // The multiplication itself, on both sides.
+      expect(lineTotal).toBeCloseTo(unitPrice * QUANTITY, 2);
+      expect(totalExpected).toBeCloseTo(unitExpected * QUANTITY, 2);
+
+      if (unitExpected !== unitOther) {
+        expect(unitPrice).not.toBeCloseTo(unitOther, 2);
+      }
+
+      // The side is named once, under the heading, and on no line.
+      await expect(
+        page.locator('[data-testid="checkout-vat-note"]'),
+      ).toHaveText(
+        await localeText(
+          page,
+          inc ? 'cart.prices_inc_vat' : 'cart.prices_ex_vat',
+        ),
+      );
+      const lineText = await item.innerText();
+      for (const key of ['common.vat_excl', 'common.vat_incl']) {
+        expect(lineText).not.toContain(await localeText(page, key));
+      }
+    });
+
+    test(`the cart and the checkout show the same ${side}-VAT total`, async ({
+      page,
+    }) => {
+      const cart = await openCheckout(page, side);
+      const checkoutTotal = await readPrice(
+        page.locator('[data-testid="checkout-summary-total"]'),
+      );
+
+      await page.goto('/cart');
+      await page.waitForLoadState('load');
+      await waitForHydration(page);
+      const cartTotal = page.locator('[data-testid="cart-summary-total"]');
+      await expect(cartTotal).toBeVisible({ timeout: 20000 });
+
+      expect(await readPrice(cartTotal)).toBeCloseTo(checkoutTotal, 2);
+      expect(checkoutTotal).toBeCloseTo(sideOf(cart, side).total, 2);
+    });
+  }
+
+  test('the VAT switcher in the checkout header moves the total to the other side', async ({
     page,
   }) => {
-    const cart = await openCheckout(page);
+    const cart = await openCheckout(page, 'ex');
+    const total = page.locator('[data-testid="checkout-summary-total"]');
+    expect(await readPrice(total)).toBeCloseTo(sideOf(cart, 'ex').total, 2);
 
-    const subtotal = await readPrice(
-      page.locator('[data-testid="checkout-summary-subtotal"]'),
-    );
-    const total = await readPrice(
-      page.locator('[data-testid="checkout-summary-total"]'),
-    );
+    await page
+      .locator('header')
+      .getByRole('button', {
+        name: await localeText(page, 'common.change_vat_display'),
+      })
+      .click();
+    await page
+      .getByRole('menuitem', {
+        name: await localeText(page, 'common.vat_incl'),
+      })
+      .click();
 
-    expect(subtotal).toBeCloseTo(cart.subTotalIncVat, 2);
-    expect(total).toBeCloseTo(cart.totalIncVat, 2);
-    expect(
-      await readPrice(page.locator('[data-testid="checkout-summary-tax"]')),
-    ).toBeCloseTo(cart.vat, 2);
-
-    // The other side of the pinning. Without this the test would pass just as
-    // well on a checkout that followed the ex-VAT default the stored session
-    // carries, which is the one thing this page deliberately does not do.
+    const incTotal = sideOf(cart, 'inc').total;
+    await expect
+      .poll(() => readPrice(total), { timeout: 10000 })
+      .toBeCloseTo(incTotal, 2);
     if (cart.vat > 0) {
-      expect(subtotal).not.toBeCloseTo(cart.subTotalExVat, 2);
-      expect(total).not.toBeCloseTo(cart.totalExVat, 2);
+      expect(incTotal).not.toBeCloseTo(sideOf(cart, 'ex').total, 2);
     }
-
-    await expectShippingMatches(
-      page.locator('[data-testid="checkout-summary-shipping"]'),
-      cart.shippingFeeFormatted,
-    );
   });
 
-  test('each line shows the inc-VAT unit price and total', async ({ page }) => {
-    const cart = await openCheckout(page);
-    const line = cart.items[0]!;
+  test('on the ex side, the amount to pay is the inc-VAT total /api/cart reports', async ({
+    page,
+  }) => {
+    const cart = await openCheckout(page, 'ex');
+    const toPay = page.locator('[data-testid="checkout-summary-to-pay"]');
 
-    const item = page.locator('[data-testid="checkout-cart-item"]').first();
-    // The unit-price id sits on the paragraph that also carries the "/ unit"
-    // suffix. That text has no digits, so the price is the only number in it.
-    const unitPrice = await readPrice(
-      item.locator('[data-testid="checkout-unit-price"]'),
+    await expect(toPay).toContainText(
+      await localeText(page, 'common.to_pay_inc_vat'),
     );
-    const lineTotal = await readPrice(
-      item.locator('[data-testid="checkout-line-total"]'),
-    );
-
-    expect(unitPrice).toBeCloseTo(line.unitPriceIncVat, 2);
-    expect(lineTotal).toBeCloseTo(line.totalPriceIncVat, 2);
-    // The multiplication itself, on both sides.
-    expect(lineTotal).toBeCloseTo(unitPrice * QUANTITY, 2);
-    expect(line.totalPriceIncVat).toBeCloseTo(
-      line.unitPriceIncVat * QUANTITY,
+    expect(await readPrice(toPay.locator('span').last())).toBeCloseTo(
+      cart.totalIncVat,
       2,
     );
-
-    if (line.unitPriceIncVat !== line.unitPriceExVat) {
-      expect(unitPrice).not.toBeCloseTo(line.unitPriceExVat, 2);
+    if (cart.vat > 0) {
+      expect(
+        await readPrice(page.locator('[data-testid="checkout-summary-total"]')),
+      ).not.toBeCloseTo(cart.totalIncVat, 2);
     }
+  });
+
+  test('on the inc side, there is no separate amount to pay', async ({
+    page,
+  }) => {
+    await openCheckout(page, 'inc');
+
+    await expect(
+      page.locator('[data-testid="checkout-summary-to-pay"]'),
+    ).toHaveCount(0);
   });
 
   test('removing the last line switches the page to the empty-cart state', async ({
     page,
   }) => {
-    await openCheckout(page);
+    await openCheckout(page, 'ex');
 
     // Removed one row at a time, waiting for each removal to land: that is the
     // buyer's path, and it covers both "one by one" and "all of them".
@@ -226,13 +331,13 @@ test.describe('Checkout summary', () => {
   });
 
   test('the discount line carries what the API reports', async ({ page }) => {
-    const cart = await openCheckout(page);
+    const cart = await openCheckout(page, 'ex');
 
     // Asserting a zero here would pass whether or not the line works, so the
     // empty case is declared rather than asserted. The day the tenant carries
     // a promotion this becomes a real assertion instead of a skip.
     outOfScope(
-      cart.discountIncVat === 0,
+      cart.discountExVat === 0,
       'tenant-config',
       'the tenant has no promotion, so the discount line never carries a value',
     );
@@ -245,6 +350,6 @@ test.describe('Checkout summary', () => {
       await readPrice(
         discountRow.locator('[data-testid="checkout-summary-discount-amount"]'),
       ),
-    ).toBeCloseTo(cart.discountIncVat, 2);
+    ).toBeCloseTo(cart.discountExVat, 2);
   });
 });

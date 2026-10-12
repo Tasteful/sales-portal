@@ -26,7 +26,11 @@
     "vat_display": "Moms",
     "change_vat_display": "Ändra momsvisning",
     "vat_incl": "Inkl. moms",
-    "vat_excl": "Exkl. moms"
+    "vat_excl": "Exkl. moms",
+    "vat": "Moms",
+    "vat_included": "Varav moms",
+    "to_pay_inc_vat": "Att betala inkl. moms",
+    "shipping_may_apply": "Kan tillkomma"
   },
   "auth": {
     "already_have_account": "Har du redan ett konto?",
@@ -109,7 +113,6 @@
     "quantity": "Antal",
     "subtotal": "Delsumma",
     "shipping": "Frakt",
-    "tax_estimated": "Moms (beräknad)",
     "total": "Totalt",
     "checkout": "Gå till kassan",
     "proceed_to_checkout": "Gå till kassan",
@@ -157,7 +160,6 @@
     "mobile": "Mobil",
     "subtotal": "Delsumma",
     "shipping": "Frakt",
-    "tax": "Moms",
     "discount": "Rabatt",
     "total": "Totalt",
     "free_shipping": "Gratis",
@@ -229,8 +231,6 @@
     "summary": "Sammanfattning",
     "subtotal": "Delsumma",
     "shipping": "Frakt",
-    "tax": "Moms",
-    "vat": "Moms",
     "discount": "Rabatt",
     "total": "Totalt",
     "billing_address": "Fakturaadress",
@@ -667,7 +667,6 @@
           "title": "Ordersammanfattning",
           "subtotal_with_count": "Delsumma ({count} artiklar)",
           "shipping": "Frakt",
-          "tax": "Moms (uppskattad)",
           "total": "Totalt"
         },
         "additional_info": {
@@ -871,7 +870,6 @@
       "subtotal": "Delsumma",
       "subtotal_with_count": "Delsumma ({count} artiklar)",
       "shipping": "Frakt",
-      "tax": "Moms",
       "grand_total": "Totalt",
       "accept": "Acceptera och lägg order",
       "decline": "Avvisa offert",
@@ -921,6 +919,7 @@
         "product": "Produkt",
         "article_number": "Art. nr",
         "price_ex_vat": "Pris (ex moms)",
+        "price_inc_vat": "Pris (inkl. moms)",
         "total_ordered": "Totalt beställt",
         "latest_order": "Senaste order",
         "latest_buyer": "Senaste köpare"

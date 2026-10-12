@@ -399,7 +399,8 @@ test.describe('Cart values', () => {
 
   /**
    * Shipping has no number before checkout: `/api/cart` sends an empty fee
-   * string until an option is selected, and both surfaces then drop the row.
+   * string until an option is selected, and both surfaces then say it may
+   * apply.
    */
   async function expectShippingMatches(
     page: Page,
@@ -407,7 +408,9 @@ test.describe('Cart values', () => {
     feeFormatted: string,
   ) {
     if (feeFormatted === '') {
-      await expect(cell).toHaveCount(0);
+      await expect(cell).toHaveText(
+        await localeText(page, 'common.shipping_may_apply'),
+      );
       return;
     }
 
@@ -431,6 +434,15 @@ test.describe('Cart values', () => {
     expect(
       await readPrice(root.locator('[data-testid="cart-summary-total"]')),
     ).toBeCloseTo(cart.totalExVat, 2);
+    // Under the ex-VAT total: what is charged, the inc-VAT total.
+    const toPay = root.locator('[data-testid="cart-summary-to-pay"]');
+    await expect(toPay).toContainText(
+      await localeText(root.page(), 'common.to_pay_inc_vat'),
+    );
+    expect(await readPrice(toPay.locator('dd'))).toBeCloseTo(
+      cart.totalIncVat,
+      2,
+    );
   }
 
   async function openCartPage(page: Page) {

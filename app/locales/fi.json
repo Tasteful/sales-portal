@@ -26,7 +26,11 @@
     "vat_display": "ALV",
     "change_vat_display": "Vaihda ALV-näkymää",
     "vat_incl": "Sis. ALV",
-    "vat_excl": "Ei sis. ALV"
+    "vat_excl": "Ei sis. ALV",
+    "vat": "ALV",
+    "vat_included": "Josta ALV",
+    "to_pay_inc_vat": "Maksettava sis. ALV",
+    "shipping_may_apply": "Voi tulla lisäksi"
   },
   "auth": {
     "already_have_account": "Onko sinulla jo tili?",
@@ -109,7 +113,6 @@
     "quantity": "Määrä",
     "subtotal": "Välisumma",
     "shipping": "Toimitus",
-    "tax_estimated": "ALV (arvio)",
     "total": "Yhteensä",
     "checkout": "Siirry kassalle",
     "proceed_to_checkout": "Siirry kassalle",
@@ -157,7 +160,6 @@
     "mobile": "Matkapuhelin",
     "subtotal": "Välisumma",
     "shipping": "Toimitus",
-    "tax": "ALV",
     "discount": "Alennus",
     "total": "Yhteensä",
     "free_shipping": "Ilmainen",
@@ -229,8 +231,6 @@
     "summary": "Yhteenveto",
     "subtotal": "Välisumma",
     "shipping": "Toimitus",
-    "tax": "ALV",
-    "vat": "ALV",
     "discount": "Alennus",
     "total": "Yhteensä",
     "billing_address": "Laskutusosoite",
@@ -667,7 +667,6 @@
           "title": "Tilauksen yhteenveto",
           "subtotal_with_count": "Välisumma ({count} tuotetta)",
           "shipping": "Toimitus",
-          "tax": "ALV (arvio)",
           "total": "Yhteensä"
         },
         "additional_info": {
@@ -871,7 +870,6 @@
       "subtotal": "Välisumma",
       "subtotal_with_count": "Välisumma ({count} tuotetta)",
       "shipping": "Toimitus",
-      "tax": "ALV",
       "grand_total": "Yhteensä",
       "accept": "Hyväksy ja tee tilaus",
       "decline": "Hylkää tarjous",
@@ -921,6 +919,7 @@
         "product": "Tuote",
         "article_number": "Tuotenro",
         "price_ex_vat": "Hinta (ei sis. ALV)",
+        "price_inc_vat": "Hinta (sis. ALV)",
         "total_ordered": "Tilattu yhteensä",
         "latest_order": "Viimeisin tilaus",
         "latest_buyer": "Viimeisin ostaja"

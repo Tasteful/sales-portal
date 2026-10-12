@@ -26,7 +26,11 @@
     "vat_display": "VAT display",
     "change_vat_display": "Change VAT display",
     "vat_incl": "Incl. VAT",
-    "vat_excl": "Excl. VAT"
+    "vat_excl": "Excl. VAT",
+    "vat": "VAT",
+    "vat_included": "Includes VAT",
+    "to_pay_inc_vat": "To pay incl. VAT",
+    "shipping_may_apply": "May apply"
   },
   "auth": {
     "already_have_account": "Already have an account?",
@@ -109,7 +113,6 @@
     "quantity": "Quantity",
     "subtotal": "Subtotal",
     "shipping": "Shipping",
-    "tax_estimated": "Tax (estimated)",
     "total": "Total",
     "checkout": "Checkout",
     "proceed_to_checkout": "Proceed to Checkout",
@@ -157,7 +160,6 @@
     "mobile": "Mobile",
     "subtotal": "Subtotal",
     "shipping": "Shipping",
-    "tax": "Tax",
     "discount": "Discount",
     "total": "Total",
     "free_shipping": "Free",
@@ -229,8 +231,6 @@
     "summary": "Summary",
     "subtotal": "Subtotal",
     "shipping": "Shipping",
-    "tax": "Tax",
-    "vat": "VAT",
     "discount": "Discount",
     "total": "Total",
     "billing_address": "Billing Address",
@@ -667,7 +667,6 @@
           "title": "Order summary",
           "subtotal_with_count": "Subtotal ({count} items)",
           "shipping": "Shipping",
-          "tax": "Tax (estimated)",
           "total": "Total"
         },
         "additional_info": {
@@ -871,7 +870,6 @@
       "subtotal": "Subtotal",
       "subtotal_with_count": "Subtotal ({count} items)",
       "shipping": "Shipping",
-      "tax": "Tax",
       "grand_total": "Total",
       "accept": "Accept and place order",
       "decline": "Decline Quote",
@@ -921,6 +919,7 @@
         "product": "Product",
         "article_number": "Art. nr",
         "price_ex_vat": "Price (ex VAT)",
+        "price_inc_vat": "Price (incl. VAT)",
         "total_ordered": "Total ordered",
         "latest_order": "Latest order",
         "latest_buyer": "Latest buyer"
