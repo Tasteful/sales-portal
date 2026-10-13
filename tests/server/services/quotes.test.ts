@@ -445,6 +445,18 @@ describe('quotes service', () => {
   // acceptQuote
   // -------------------------------------------------------------------------
   describe('acceptQuote', () => {
+    it('asks for no timeout: a write may finish upstream after a cut', async () => {
+      mockGraphqlMutation.mockResolvedValueOnce({
+        acceptQuotation: makeRawQuotationCart(),
+      });
+
+      await quotesService.acceptQuote('cart-001', mockEvent);
+
+      expect(mockGraphqlMutation.mock.calls[0]![0]).toMatchObject({
+        requestOptions: { context: { timeoutMs: 0 } },
+      });
+    });
+
     it('calls graphql.mutation with acceptQuotation mutation', async () => {
       const cart = makeRawQuotationCart({ status: 'ACCEPTED' });
       mockGraphqlMutation.mockResolvedValueOnce({ acceptQuotation: cart });
@@ -470,6 +482,18 @@ describe('quotes service', () => {
   // rejectQuote
   // -------------------------------------------------------------------------
   describe('rejectQuote', () => {
+    it('asks for no timeout: a write may finish upstream after a cut', async () => {
+      mockGraphqlMutation.mockResolvedValueOnce({
+        rejectQuotation: makeRawQuotationCart(),
+      });
+
+      await quotesService.rejectQuote('cart-001', mockEvent);
+
+      expect(mockGraphqlMutation.mock.calls[0]![0]).toMatchObject({
+        requestOptions: { context: { timeoutMs: 0 } },
+      });
+    });
+
     it('calls graphql.mutation with rejectQuotation mutation', async () => {
       const cart = makeRawQuotationCart({ status: 'REJECTED' });
       mockGraphqlMutation.mockResolvedValueOnce({ rejectQuotation: cart });

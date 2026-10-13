@@ -353,6 +353,8 @@ export async function acceptQuote(
           languageId,
         },
         userToken: requestContext?.userToken,
+        // No timeout: a quote Geins accepts after a cut would read as failed.
+        requestOptions: { context: { timeoutMs: 0 } },
       }),
     'quotes',
   );
@@ -380,6 +382,8 @@ export async function rejectQuote(
           languageId,
         },
         userToken: requestContext?.userToken,
+        // No timeout: a quote Geins accepts after a cut would read as failed.
+        requestOptions: { context: { timeoutMs: 0 } },
       }),
     'quotes',
   );
