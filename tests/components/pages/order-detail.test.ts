@@ -8,6 +8,7 @@ import {
   assert,
 } from 'vitest';
 import type { AuthUser } from '@geins/types';
+import { enableAutoUnmount } from '@vue/test-utils';
 import type { PublicTenantConfig } from '#shared/types/tenant-config';
 import { shallowMountComponent } from '../../utils/component';
 import OrderDetail from '../../../app/pages/portal/orders/[id].vue';
@@ -15,6 +16,10 @@ import LineSpecification from '../../../app/components/cart/LineSpecification.vu
 import { useTenant } from '../../../app/composables/useTenant';
 import { useAuthStore } from '../../../app/stores/auth';
 import { mockIsCatalogMode, mockShowIncVat } from '../../setup-components';
+
+// The route's query is reactive here, so a page left mounted would react to
+// the next test's reset: its 404s and polls would count against that test.
+enableAutoUnmount(afterEach);
 
 // Escapes the tier-wide mock, which answers true for every key; see
 // tests/setup-components.ts. The real chain then runs over the fixture below.
@@ -58,6 +63,9 @@ const {
   mockShowError,
   mockCreateError,
   mockUseHead,
+  mockQuery,
+  mockReplace,
+  mockPollFetch,
 } = vi.hoisted(() => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { ref } = require('vue') as typeof import('vue');
@@ -83,6 +91,11 @@ const {
     mockShowError: vi.fn(),
     mockCreateError: createErrorFn,
     mockUseHead: vi.fn(),
+    // `?awaiting=`, the order the confirmation link says is on its way.
+    mockQuery: ref<Record<string, string>>({}),
+    mockReplace: vi.fn(() => Promise.resolve()),
+    // The waiting poll calls `$fetch` directly, not the page's useFetch.
+    mockPollFetch: vi.fn(),
   };
 });
 
@@ -128,31 +141,31 @@ vi.mock('#app/composables/head', () => ({
 
 // Mock route with an id param
 const TEST_ORDER_ID = 'abc-123-def';
-vi.stubGlobal('useRoute', () => ({
-  params: { id: TEST_ORDER_ID },
-  path: `/portal/orders/${TEST_ORDER_ID}`,
-  query: {},
-  hash: '',
-  fullPath: `/portal/orders/${TEST_ORDER_ID}`,
-  name: 'portal-orders-id',
-  matched: [],
-  meta: {},
-}));
+function testRoute() {
+  return {
+    params: { id: TEST_ORDER_ID },
+    path: `/portal/orders/${TEST_ORDER_ID}`,
+    // A getter, so dropping `?awaiting=` in a test reaches the page.
+    get query() {
+      return mockQuery.value;
+    },
+    hash: '',
+    fullPath: `/portal/orders/${TEST_ORDER_ID}`,
+    name: 'portal-orders-id',
+    matched: [],
+    meta: {},
+  };
+}
+
+vi.stubGlobal('useRoute', testRoute);
+vi.stubGlobal('$fetch', (...args: unknown[]) => mockPollFetch(...args));
 
 vi.mock('#app/composables/router', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
-    useRoute: () => ({
-      params: { id: TEST_ORDER_ID },
-      path: `/portal/orders/${TEST_ORDER_ID}`,
-      query: {},
-      hash: '',
-      fullPath: `/portal/orders/${TEST_ORDER_ID}`,
-      name: 'portal-orders-id',
-      matched: [],
-      meta: {},
-    }),
+    useRoute: testRoute,
+    useRouter: () => ({ push: vi.fn(), replace: mockReplace }),
     navigateTo: (...args: Parameters<typeof mockNavigateTo>) =>
       mockNavigateTo(...args),
   };
@@ -300,6 +313,10 @@ function makeOrder(overrides: Record<string, unknown> = {}) {
 }
 
 const defaultStubs = {
+  // Rendered for real: the page's rows, summary and addresses live in them.
+  OrderItemsTable: false,
+  OrderSummaryCard: false,
+  OrderAddresses: false,
   PortalShell: {
     template: '<div data-testid="portal-shell"><slot /></div>',
   },
@@ -345,6 +362,9 @@ describe('OrderDetail', () => {
     mockNavigateTo.mockClear();
     mockAddItems.mockResolvedValue(undefined);
     mockShowIncVat.value = true;
+    mockQuery.value = {};
+    mockReplace.mockClear();
+    mockPollFetch.mockReset();
   });
 
   // canReorder is `canAccess('reorder') && !isCatalogMode`, so each test has to
@@ -413,6 +433,8 @@ describe('OrderDetail', () => {
 
       expect(wrapper.find('[data-testid="order-loading"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="order-detail"]').exists()).toBe(false);
+      // An ordinary load is not a wait for a new order: no waiting text.
+      expect(wrapper.find('[data-testid="order-loading"]').text()).toBe('');
     });
   });
 
@@ -444,6 +466,150 @@ describe('OrderDetail', () => {
         statusCode: number;
       };
       expect(errorArg.statusCode).toBe(404);
+    });
+  });
+
+  /**
+   * Arriving from the confirmation page before the platform has the order.
+   *
+   * The link carries `?awaiting=<publicId>`. With it, a miss is a wait rather
+   * than a 404: the page polls the order until it is readable, bounded. The
+   * parameter is dropped as soon as the order is on screen, whichever response
+   * brought it, so a reload starts no new wait.
+   */
+  describe('awaiting a just-placed order', () => {
+    function notFound() {
+      return Object.assign(new Error('Not found'), { statusCode: 404 });
+    }
+
+    function mount() {
+      return shallowMountComponent(OrderDetail, {
+        global: { stubs: defaultStubs },
+      });
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('drops the parameter when the order is there on the first response', async () => {
+      mockQuery.value = { awaiting: TEST_ORDER_ID, tab: 'rows' };
+      mockData.value = makeOrder();
+      mount();
+
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(mockReplace).toHaveBeenCalledWith({ query: { tab: 'rows' } });
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(mockPollFetch).not.toHaveBeenCalled();
+    });
+
+    it('waits on a miss instead of showing a 404', async () => {
+      mockQuery.value = { awaiting: TEST_ORDER_ID };
+      mockError.value = notFound();
+      mockPollFetch.mockRejectedValue(notFound());
+      const wrapper = mount();
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(mockShowError).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-testid="order-loading"]').exists()).toBe(true);
+      expect(mockPollFetch.mock.calls).toEqual([
+        [`/api/orders/${TEST_ORDER_ID}`, { cache: 'no-store' }],
+        [`/api/orders/${TEST_ORDER_ID}`, { cache: 'no-store' }],
+      ]);
+    });
+
+    it('renders the order when it arrives, then drops the parameter', async () => {
+      mockQuery.value = { awaiting: TEST_ORDER_ID };
+      mockError.value = notFound();
+      mockPollFetch.mockResolvedValue(makeOrder());
+      const wrapper = mount();
+
+      await vi.advanceTimersByTimeAsync(2500);
+
+      expect(wrapper.find('[data-testid="order-detail"]').exists()).toBe(true);
+      expect(mockReplace).toHaveBeenCalledWith({ query: {} });
+      expect(mockShowError).not.toHaveBeenCalled();
+    });
+
+    it('keeps the order it waited for once the parameter is gone', async () => {
+      mockQuery.value = { awaiting: TEST_ORDER_ID };
+      mockError.value = notFound();
+      mockPollFetch.mockResolvedValue(makeOrder());
+      const wrapper = mount();
+      await vi.advanceTimersByTimeAsync(2500);
+
+      // What `router.replace` does, and a later refetch settling: the first
+      // response's 404 is still on the fetch, but the order is on screen.
+      mockQuery.value = {};
+      mockPending.value = true;
+      await wrapper.vm.$nextTick();
+      mockPending.value = false;
+      await wrapper.vm.$nextTick();
+
+      expect(mockShowError).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-testid="order-detail"]').exists()).toBe(true);
+    });
+
+    it('says it is fetching the order while it waits, as a status', () => {
+      mockQuery.value = { awaiting: TEST_ORDER_ID };
+      mockError.value = notFound();
+      mockPollFetch.mockRejectedValue(notFound());
+      const indicator = mount().find('[data-testid="order-loading"]');
+
+      expect(indicator.attributes('role')).toBe('status');
+      expect(indicator.text()).toBe('common.fetching_order');
+    });
+
+    it('at the bound, says it is slow and offers the way back, without a 404', async () => {
+      mockQuery.value = { awaiting: TEST_ORDER_ID };
+      mockError.value = notFound();
+      mockPollFetch.mockRejectedValue(notFound());
+      const wrapper = mount();
+
+      await vi.advanceTimersByTimeAsync(115000);
+      expect(wrapper.find('[data-testid="order-slow"]').exists()).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(mockShowError).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-testid="order-loading"]').exists()).toBe(
+        false,
+      );
+      const slow = wrapper.find('[data-testid="order-slow"]');
+      expect(slow.attributes('role')).toBe('status');
+      expect(slow.text()).toContain('portal.orders.detail.order_slow');
+      expect(slow.find('[data-testid="back-link"]').attributes('href')).toBe(
+        '/se/en/portal/orders',
+      );
+      // Kept, so a reload waits again.
+      expect(mockReplace).not.toHaveBeenCalled();
+    });
+
+    it('shows the 404 at once without the parameter, and does not wait', async () => {
+      mockError.value = notFound();
+      mount();
+
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(mockShowError).toHaveBeenCalledTimes(1);
+      expect(mockPollFetch).not.toHaveBeenCalled();
+    });
+
+    it('does not wait for a different order than the one on the page', async () => {
+      mockQuery.value = { awaiting: 'some-other-order' };
+      mockError.value = notFound();
+      mount();
+
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(mockShowError).toHaveBeenCalledTimes(1);
+      expect(mockPollFetch).not.toHaveBeenCalled();
     });
   });
 
@@ -1561,8 +1727,9 @@ describe('OrderDetail', () => {
       ).toBe(false);
     });
 
-    it('hides the additional info section when all three fields are absent', () => {
-      mockData.value = makeOrder();
+    it('hides the additional info section when every field is absent', () => {
+      // The payment method lives in this block too, so it goes as well.
+      mockData.value = makeOrder({ paymentDetails: [] });
       const wrapper = shallowMountComponent(OrderDetail, {
         global: { stubs: defaultStubs },
       });
@@ -1570,5 +1737,244 @@ describe('OrderDetail', () => {
         wrapper.find('[data-testid="order-additional-info"]').exists(),
       ).toBe(false);
     });
+  });
+});
+
+/**
+ * Fees on a placed order: a row only when the order carries the fee (> 0), on
+ * the chosen VAT side, in the card, the table footer and the mobile sheet.
+ */
+describe('OrderDetail — fees', () => {
+  const PAYMENT_FEE = {
+    sellingPriceIncVat: 25,
+    sellingPriceIncVatFormatted: '25,00 kr',
+    sellingPriceExVat: 20,
+    sellingPriceExVatFormatted: '20,00 kr',
+  };
+  const NO_SHIPPING = {
+    feeIncVat: 0,
+    feeIncVatFormatted: '0,00 kr',
+    feeExVat: 0,
+    feeExVatFormatted: '0,00 kr',
+  };
+
+  beforeEach(() => {
+    mockData.value = null;
+    mockError.value = null;
+    mockPending.value = false;
+    mockQuery.value = {};
+    mockShowIncVat.value = true;
+  });
+
+  function mountWith(overrides: Record<string, unknown>) {
+    mockData.value = makeOrder(overrides);
+    return shallowMountComponent(OrderDetail, {
+      global: { stubs: defaultStubs },
+    });
+  }
+
+  function orderWithShipping(
+    shipping: Record<string, unknown> | undefined,
+    shippingFee?: Record<string, unknown>,
+  ) {
+    const { order } = makeOrder();
+    const cart = order.cart as { summary: Record<string, unknown> };
+    return {
+      cart: { ...cart, summary: { ...cart.summary, shipping } },
+      shippingFee,
+    };
+  }
+
+  function sheetTotals(wrapper: ReturnType<typeof mountWith>) {
+    const sheet = wrapper.findComponent({ name: 'PortalItemRowsSheet' });
+    return (sheet.props('totals') as { label: string; value?: string }[]).map(
+      (row) => row.label,
+    );
+  }
+
+  it.each([
+    [
+      'a zero fee',
+      NO_SHIPPING,
+      { sellingPriceIncVat: 0, sellingPriceExVat: 0 },
+    ],
+    ['no fee at all', undefined, undefined],
+  ])('shows no shipping row for %s', (_, shipping, shippingFee) => {
+    const wrapper = mountWith(orderWithShipping(shipping, shippingFee));
+
+    expect(
+      wrapper.find('[data-testid="order-summary-shipping"]').exists(),
+    ).toBe(false);
+    expect(
+      wrapper.find('[data-testid="order-items-footer-shipping"]').exists(),
+    ).toBe(false);
+    expect(sheetTotals(wrapper)).not.toContain(
+      'portal.orders.detail.summary.shipping',
+    );
+  });
+
+  it.each([
+    [true, '49,00 kr'],
+    [false, '39,20 kr'],
+  ])(
+    'shows the shipping row on the chosen side (incl. VAT: %s)',
+    (incVat, value) => {
+      mockShowIncVat.value = incVat;
+      const wrapper = mountWith({});
+
+      expect(
+        wrapper.find('[data-testid="order-summary-shipping"]').text(),
+      ).toBe(value);
+      expect(
+        wrapper.find('[data-testid="order-items-footer-shipping"]').text(),
+      ).toBe(value);
+      expect(sheetTotals(wrapper)).toContain(
+        'portal.orders.detail.summary.shipping',
+      );
+    },
+  );
+
+  it.each([
+    // The cart summary carries only the other side; the order's own fee fills
+    // the side being read.
+    [true, { feeExVat: 1, feeExVatFormatted: '1,00 kr' }, '62,50 kr'],
+    [false, { feeIncVat: 1, feeIncVatFormatted: '1,00 kr' }, '50,00 kr'],
+  ])(
+    "falls back to the order's shipping fee, field by field (incl. VAT: %s)",
+    (incVat, shipping, value) => {
+      mockShowIncVat.value = incVat;
+      const wrapper = mountWith(
+        orderWithShipping(shipping, {
+          sellingPriceIncVat: 62.5,
+          sellingPriceIncVatFormatted: '62,50 kr',
+          sellingPriceExVat: 50,
+          sellingPriceExVatFormatted: '50,00 kr',
+        }),
+      );
+
+      expect(
+        wrapper.find('[data-testid="order-summary-shipping"]').text(),
+      ).toBe(value);
+    },
+  );
+
+  it.each([
+    [true, '25,00 kr'],
+    [false, '20,00 kr'],
+  ])(
+    'shows the payment fee on the chosen side (incl. VAT: %s)',
+    (incVat, value) => {
+      mockShowIncVat.value = incVat;
+      const wrapper = mountWith({ paymentFee: PAYMENT_FEE });
+
+      expect(
+        wrapper.find('[data-testid="order-summary-payment-fee"]').text(),
+      ).toBe(value);
+      expect(
+        wrapper.find('[data-testid="order-items-footer-payment-fee"]').text(),
+      ).toBe(value);
+      expect(sheetTotals(wrapper)).toContain('common.payment_fee');
+    },
+  );
+
+  it.each([
+    ['a zero fee', { sellingPriceIncVat: 0, sellingPriceExVat: 0 }],
+    ['no fee at all', undefined],
+  ])('shows no payment-fee row for %s', (_, paymentFee) => {
+    const wrapper = mountWith({ paymentFee });
+
+    expect(
+      wrapper.find('[data-testid="order-summary-payment-fee"]').exists(),
+    ).toBe(false);
+    expect(
+      wrapper.find('[data-testid="order-items-footer-payment-fee"]').exists(),
+    ).toBe(false);
+    expect(sheetTotals(wrapper)).not.toContain('common.payment_fee');
+  });
+});
+
+describe('OrderDetail — discount, payment method and the inc-VAT label', () => {
+  beforeEach(() => {
+    mockData.value = null;
+    mockError.value = null;
+    mockPending.value = false;
+    mockQuery.value = {};
+    mockShowIncVat.value = true;
+  });
+
+  function mountWith(overrides: Record<string, unknown>) {
+    mockData.value = makeOrder(overrides);
+    return shallowMountComponent(OrderDetail, {
+      global: { stubs: defaultStubs },
+    });
+  }
+
+  function withDiscount(inc: number | undefined, ex: number | undefined) {
+    const { order } = makeOrder();
+    const cart = order.cart as { summary: Record<string, unknown> };
+    return {
+      cart: {
+        ...cart,
+        summary: {
+          ...cart.summary,
+          fixedAmountDiscountIncVat: inc,
+          fixedAmountDiscountExVat: ex,
+        },
+      },
+    };
+  }
+
+  it.each([
+    [true, '25'],
+    [false, '20'],
+  ])(
+    'shows the order discount on the chosen side (incl. VAT: %s)',
+    (incVat, amount) => {
+      mockShowIncVat.value = incVat;
+      const wrapper = mountWith(withDiscount(25, 20));
+
+      expect(
+        wrapper.find('[data-testid="order-summary-discount"]').text(),
+      ).toMatch(new RegExp(`-\\D*${amount}`));
+      expect(
+        wrapper.find('[data-testid="order-items-footer-discount"]').text(),
+      ).toMatch(new RegExp(`-\\D*${amount}`));
+    },
+  );
+
+  it("formats the discount in the buyer's own locale", () => {
+    const wrapper = mountWith(withDiscount(25, 20));
+
+    expect(
+      wrapper.find('[data-testid="order-items-footer-discount"]').text(),
+    ).toBe('-SEK\u00a025.00');
+  });
+
+  it('shows no discount row without a discount', () => {
+    const wrapper = mountWith(withDiscount(0, 0));
+
+    expect(
+      wrapper.find('[data-testid="order-summary-discount"]').exists(),
+    ).toBe(false);
+  });
+
+  it('shows the payment method in the additional information', () => {
+    const wrapper = mountWith({
+      paymentDetails: [{ displayName: 'Faktura 30 dagar', name: 'Invoice' }],
+    });
+
+    expect(
+      wrapper.find('[data-testid="additional-payment-method"]').text(),
+    ).toContain('Faktura 30 dagar');
+  });
+
+  it('labels the inc-VAT line "total incl. VAT" on the order page', () => {
+    mockShowIncVat.value = false;
+    const wrapper = mountWith({});
+
+    expect(
+      wrapper.find('[data-testid="order-summary-total-inc-vat"]').element
+        .previousElementSibling?.textContent,
+    ).toBe('common.total_inc_vat');
   });
 });

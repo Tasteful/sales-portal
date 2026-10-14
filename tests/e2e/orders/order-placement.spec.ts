@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import {
+  type ApiOrder,
   addToCart,
   discoverPurchasableProduct,
   fetchCart,
@@ -95,7 +96,8 @@ interface ConfiguredLine {
  * first real run, and it is far outside what the first four suggested.
  *
  * 120s is roughly two and a half times that worst case, and it is the same
- * number the orders page gives the platform before it stops waiting. Two
+ * number the confirmation and order pages give the platform before they stop
+ * waiting (`useAwaitedOrder`). Two
  * different bounds would disagree about a platform that landed between them —
  * one calling it healthy while the other called it late. Raising it needs new
  * numbers, not a shrug; exceeding it fails the test with the measured wait,
@@ -147,9 +149,10 @@ interface ScreenOrderLine {
 }
 
 /**
- * The lines the order detail page renders. Desktop only: this project runs
- * chromium at a desktop viewport, where the table is the visible shape and the
- * mobile sheet behind `view-rows-trigger` is not.
+ * The lines the order table renders, on the order page and the confirmation
+ * alike. Desktop only: this project runs chromium at a desktop viewport, where
+ * the table is the visible shape and the mobile sheet behind
+ * `view-rows-trigger` is not.
  */
 async function readOrderLines(page: Page): Promise<ScreenOrderLine[]> {
   const rows = page.locator('[data-testid="order-item-row"]');
@@ -246,6 +249,61 @@ async function addConfiguredLine(
     quantity: commit.quantity,
     unitPriceIncVat: commit.unitPrice.sellingPriceIncVat,
   };
+}
+
+/**
+ * One order, as both the confirmation and the order detail page render it:
+ * the same components, so the same reading and the same checks. Read on the
+ * ex side, as step 1 sets it.
+ */
+async function expectOrderMatchesApi(
+  page: Page,
+  order: ApiOrder,
+  surface: string,
+): Promise<void> {
+  const screenLines = await readOrderLines(page);
+  expect(screenLines.length).toBe(order.items.length);
+  for (const [index, line] of order.items.entries()) {
+    const screen = screenLines[index]!;
+    const where = `order line ${index} (article ${line.articleNumber}), rendered on the ${surface}`;
+    expect(screen.articleNumber, `${where}: wrong article number`).toBe(
+      line.articleNumber,
+    );
+    expect(screen.quantity, `${where}: wrong quantity`).toBe(line.quantity);
+    expect(screen.unitPrice, `${where}: wrong unit price`).toBeCloseTo(
+      line.unitPriceExVat,
+      2,
+    );
+    expect(screen.totalPrice, `${where}: wrong line total`).toBeCloseTo(
+      line.totalPriceExVat,
+      2,
+    );
+    // The multiplication itself, on both sides.
+    expect(
+      screen.totalPrice,
+      `${where}: the rendered total is not quantity x unit price`,
+    ).toBeCloseTo(screen.unitPrice * screen.quantity, 2);
+    expect(
+      line.totalPriceExVat,
+      `${where}: the API's own total is not quantity x unit price`,
+    ).toBeCloseTo(line.unitPriceExVat * line.quantity, 2);
+  }
+
+  expect(
+    await readPrice(page.locator('[data-testid="order-summary-subtotal"]')),
+  ).toBeCloseTo(order.subTotalExVat, 2);
+  expect(
+    await readPrice(page.locator('[data-testid="order-summary-tax"]')),
+  ).toBeCloseTo(order.vat, 2);
+  expect(
+    await readPrice(page.locator('[data-testid="order-summary-total"]')),
+  ).toBeCloseTo(order.totalExVat, 2);
+  expect(
+    await readPrice(
+      page.locator('[data-testid="order-summary-total-inc-vat"]'),
+    ),
+    `${surface}: the inc-VAT line under the total`,
+  ).toBeCloseTo(order.totalIncVat, 2);
 }
 
 /**
@@ -381,12 +439,15 @@ test('a placed order carries the cart it was built from all the way to the porta
   // The response rather than the URL. `checkoutStore.placeOrder` swallows a
   // failure into `error.value` and never throws, so a failed order otherwise
   // looks exactly like a page that did not navigate.
-  // Registered before the navigation: the confirmation page fetches the summary
-  // as it mounts, and that is the request this run needs to see.
-  const summaryResponse = page.waitForResponse(
-    (r) => r.url().includes('/api/checkout/summary'),
-    { timeout: PAGE_TIMEOUT },
-  );
+  // Registered before the navigation, so a summary request fired as the
+  // confirmation page mounts is counted too. The in-app confirmation reads the
+  // order instead: Geins's checkout summary never carries an order placed here.
+  const summaryRequests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/api/checkout/summary')) {
+      summaryRequests.push(request.url());
+    }
+  });
 
   const [created] = await Promise.all([
     page.waitForResponse(
@@ -410,7 +471,7 @@ test('a placed order carries the cart it was built from all the way to the porta
   expect(orderId, 'create-order returned no orderId').toBeTruthy();
   annotate(`placed order ${orderId} (publicId ${publicId})`);
 
-  // ---------- 4. The confirmation page ----------
+  // ---------- 4. The confirmation page, before the order is readable ----------
 
   await page.waitForURL(/order-confirmation/, { timeout: PAGE_TIMEOUT });
   await waitForHydration(page);
@@ -422,47 +483,36 @@ test('a placed order carries the cart it was built from all the way to the porta
   expect(query.get('orderId')).toBe(publicId);
   expect(query.get('orderNumber')).toBe(orderId);
 
-  await expect(
-    page.locator('[data-testid="order-confirmation-loading"]'),
-  ).toBeHidden({
-    timeout: PAGE_TIMEOUT,
-  });
-
-  // `displayOrderNumber` is `summary?.orderId || props.orderNumber`, and there
-  // is no summary (below), so the badge shows the numeric id from the query.
+  // At once, from the URL alone: nothing here waits for the platform.
   await expect(page.locator('[data-testid="order-number"]')).toContainText(
     orderId!,
+    { timeout: PAGE_TIMEOUT },
   );
-
-  // This asserts the FALLBACK branch on purpose, rather than declaring the
-  // summary out of scope. Both assertions are expected to go red the day
-  // `/api/checkout/summary` starts answering — that is the alarm telling whoever
-  // fixes it to come back and assert the summary's own numbers here instead.
-  //
-  // The status, not just the absence: `orderSummary` is null for a 200 with an
-  // empty body too, so an absent box alone would keep passing through a partial
-  // fix. And the CTA below is the anchor — a missing summary box is trivially
-  // true while the page is still a skeleton, so the box is asserted absent only
-  // once something on the rendered branch is visible.
-  expect(
-    (await summaryResponse).status(),
-    'the confirmation summary endpoint no longer answers 502, so this spec is asserting the wrong branch',
-  ).toBe(502);
-
   const viewOrder = page.locator('[data-testid="view-order-cta"]');
   await expect(viewOrder).toBeVisible({ timeout: PAGE_TIMEOUT });
-  await expect(page.locator('[data-testid="summary-box"]')).toHaveCount(0);
+  const viewOrderHref = await viewOrder.getAttribute('href');
+  expect(viewOrderHref).toMatch(
+    new RegExp(`/portal/orders/${publicId}\\?awaiting=${publicId}$`),
+  );
 
-  // ---------- 5. Into the portal ----------
+  // ---------- 5. The order page's wait, on the same order ----------
 
-  await viewOrder.click();
-
-  // The link carries the order it just saw created, which is what lets the list
-  // wait for that one order instead of rendering without it.
-  await page.waitForURL(new RegExp(`/portal/orders\\?awaiting=${publicId}$`), {
-    timeout: PAGE_TIMEOUT,
-  });
-  await waitForHydration(page);
+  // Opened at once, so it most likely arrives before the platform has the
+  // order and has to wait for it. "Most likely": the platform's 5 s minimum
+  // makes it a race, so whether it actually waited is recorded, not asserted.
+  // Read from the page, not the network: the first read happens in the server
+  // render, which the browser never sees.
+  const early = await page.context().newPage();
+  await early.goto(viewOrderHref!);
+  await waitForHydration(early);
+  const earlyWaited = await early
+    .locator('[data-testid="order-loading"]')
+    .isVisible();
+  annotate(
+    earlyWaited
+      ? 'order page opened at once was waiting for the order'
+      : 'order page opened at once already had the order',
+  );
 
   // ---------- 6. Wait for the platform, on a budget ----------
 
@@ -490,100 +540,92 @@ test('a placed order carries the cart it was built from all the way to the porta
 
   const order = await fetchOrder(page, publicId!);
 
-  // ---------- 7. The row arrives on its own ----------
+  // ---------- 7. Both pages reach the order by themselves ----------
 
-  // There is no `page.reload()` anywhere in this test, deliberately. A reload
-  // would step around the defect the rest of this branch fixes and the spec
-  // would pass while a buyer still had to reload by hand.
+  // There is no `page.reload()` anywhere in this test, deliberately: a reload
+  // would step around the wait and the spec would pass while a buyer still had
+  // to reload by hand.
   //
-  // The margin is measured from the API poll above, which is why that poll is
-  // worth its cost even though it asserts nothing about the page: `page.request`
-  // does not use the browser's HTTP cache, so it records when the *platform*
-  // made the order readable. Anything after that point is ours. The page polls
-  // every 2.5s, so three ticks plus a render is generous for it and still tight
-  // enough that a page reaching the order only via the browser's 30s cache
-  // window fails here — and fails pointing at us rather than at the platform.
+  // The margin is measured from the API poll above: `page.request` does not use
+  // the browser's HTTP cache, so it records when the *platform* made the order
+  // readable, and anything after that point is ours. The pages poll every 2.5s,
+  // so three ticks plus a render is generous and still tight enough that a page
+  // reaching the order only via the browser's 30s cache window fails here.
   const SELF_ARRIVAL_MS = 9000;
+  const ours =
+    `/api/orders/${publicId} answered 200 after ${waited}s, so the platform ` +
+    'has published it and the delay is on our side — the waiting poll, or the ' +
+    'browser serving the cached 404.';
 
-  // Both list shapes are in the DOM at once and CSS decides which shows; this
-  // project runs a desktop viewport, where the row is a `<tr>` carrying the
-  // link in its last cell. The link is what pairs the row with the order:
-  // the id column shows the numeric id, the detail endpoint keys on publicId.
-  const row = page
-    .locator('[data-testid="order-row"]:visible')
-    .filter({ has: page.locator(`a[href$="/portal/orders/${publicId}"]`) })
-    .first();
   await expect(
-    row,
-    `/api/orders/${publicId} answered 200 after ${waited}s, but the list did not ` +
-      `reach the order by itself within ${SELF_ARRIVAL_MS / 1000}s of that. The ` +
-      `platform has published it, so the delay is on our side — the waiting poll, ` +
-      `or the browser serving it the cached order-less list.`,
+    page.locator('[data-testid="confirmation-order"]'),
+    `the confirmation did not show the order within ${SELF_ARRIVAL_MS / 1000}s. ${ours}`,
   ).toBeVisible({ timeout: SELF_ARRIVAL_MS });
+  await expect(
+    page.locator('[data-testid="confirmation-order-loading"]'),
+    'the waiting indicator stayed after the order rendered',
+  ).toHaveCount(0);
+  expect(
+    summaryRequests,
+    'the in-app confirmation asked for the checkout summary',
+  ).toEqual([]);
 
-  // The wait cleans up after itself: once the row is there the parameter is
-  // gone, so a reload does not start a fresh wait for an order already in hand.
+  await test.step('the confirmation renders what the orders API reports', async () => {
+    await expectOrderMatchesApi(page, order, 'confirmation');
+  });
+
+  await expect(
+    early.locator('[data-testid="order-detail"]'),
+    `the order page opened at once did not show the order within ${SELF_ARRIVAL_MS / 1000}s. ${ours}`,
+  ).toBeVisible({ timeout: SELF_ARRIVAL_MS });
+  // The wait cleans up after itself, so a reload starts no fresh wait.
+  await expect
+    .poll(() => new URL(early.url()).searchParams.has('awaiting'), {
+      timeout: 5000,
+    })
+    .toBe(false);
+  await early.close();
+
+  // Now readable: the buyer's own click lands on a page that has the order on
+  // its first response, and drops the parameter all the same.
+  await viewOrder.click();
+  await page.waitForURL(new RegExp(`/portal/orders/${publicId}(\\?|$)`), {
+    timeout: PAGE_TIMEOUT,
+  });
+  await waitForHydration(page);
+  await expect(page.locator('[data-testid="order-detail"]')).toBeVisible({
+    timeout: PAGE_TIMEOUT,
+  });
   await expect
     .poll(() => new URL(page.url()).searchParams.has('awaiting'), {
       timeout: 5000,
     })
     .toBe(false);
 
-  expect(
-    await readPrice(row.locator('[data-testid="order-total"]')),
-  ).toBeCloseTo(order.totalExVat, 2);
-
   // ---------- 8. The detail page, against its own API ----------
 
   await test.step('the order detail page renders what the orders API reports', async () => {
-    // Followed rather than typed: the buyer's own route, and it keeps the
-    // locale out of the spec — the prefix belongs to the tenant's
-    // configuration, and a hardcoded one asserts that configuration by accident.
-    await row.locator(`a[href$="/portal/orders/${publicId}"]`).click();
-    await page.waitForURL(new RegExp(`/portal/orders/${publicId}$`), {
-      timeout: PAGE_TIMEOUT,
-    });
+    await expectOrderMatchesApi(page, order, 'order detail page');
+  });
+
+  // ---------- 8b. The list, from the order's own back link ----------
+
+  await test.step('the order list carries the order and its total', async () => {
+    await page.locator('[data-testid="back-link"]').click();
+    await page.waitForURL(/\/portal\/orders(\?|$)/, { timeout: PAGE_TIMEOUT });
     await waitForHydration(page);
-    await expect(page.locator('[data-testid="order-detail"]')).toBeVisible({
-      timeout: PAGE_TIMEOUT,
-    });
 
-    const screenLines = await readOrderLines(page);
-    expect(screenLines.length).toBe(order.items.length);
-    for (const [index, line] of order.items.entries()) {
-      const screen = screenLines[index]!;
-      const where = `order line ${index} (article ${line.articleNumber}), rendered on the order detail page`;
-      expect(screen.articleNumber, `${where}: wrong article number`).toBe(
-        line.articleNumber,
-      );
-      expect(screen.quantity, `${where}: wrong quantity`).toBe(line.quantity);
-      expect(screen.unitPrice, `${where}: wrong unit price`).toBeCloseTo(
-        line.unitPriceExVat,
-        2,
-      );
-      expect(screen.totalPrice, `${where}: wrong line total`).toBeCloseTo(
-        line.totalPriceExVat,
-        2,
-      );
-      // The multiplication itself, on both sides.
-      expect(
-        screen.totalPrice,
-        `${where}: the rendered total is not quantity x unit price`,
-      ).toBeCloseTo(screen.unitPrice * screen.quantity, 2);
-      expect(
-        line.totalPriceExVat,
-        `${where}: the API's own total is not quantity x unit price`,
-      ).toBeCloseTo(line.unitPriceExVat * line.quantity, 2);
-    }
-
+    // Both list shapes are in the DOM at once and CSS decides which shows; this
+    // project runs a desktop viewport, where the row is a `<tr>` carrying the
+    // link in its last cell. The link is what pairs the row with the order:
+    // the id column shows the numeric id, the detail endpoint keys on publicId.
+    const row = page
+      .locator('[data-testid="order-row"]:visible')
+      .filter({ has: page.locator(`a[href$="/portal/orders/${publicId}"]`) })
+      .first();
+    await expect(row).toBeVisible({ timeout: PAGE_TIMEOUT });
     expect(
-      await readPrice(page.locator('[data-testid="order-summary-subtotal"]')),
-    ).toBeCloseTo(order.subTotalExVat, 2);
-    expect(
-      await readPrice(page.locator('[data-testid="order-summary-tax"]')),
-    ).toBeCloseTo(order.vat, 2);
-    expect(
-      await readPrice(page.locator('[data-testid="order-summary-total"]')),
+      await readPrice(row.locator('[data-testid="order-total"]')),
     ).toBeCloseTo(order.totalExVat, 2);
   });
 

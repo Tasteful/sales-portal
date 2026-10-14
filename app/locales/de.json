@@ -30,8 +30,10 @@
     "vat": "MwSt.",
     "vat_included": "Davon MwSt.",
     "to_pay_inc_vat": "Zu zahlen inkl. MwSt.",
+    "payment_fee": "Zahlungsgebühr",
     "total_inc_vat": "Gesamt inkl. MwSt.",
-    "shipping_may_apply": "Kann anfallen"
+    "shipping_may_apply": "Kann anfallen",
+    "fetching_order": "Ihre Bestellung wird geladen…"
   },
   "auth": {
     "already_have_account": "Sie haben bereits ein Konto?",
@@ -173,8 +175,7 @@
       "svea": "Svea",
       "walley": "Walley",
       "avarda": "Avarda",
-      "geins_pay": "Geins Pay",
-      "standard": "Standardzahlung"
+      "geins_pay": "Geins Pay"
     },
     "no_shipping_methods": "Keine Versandarten verfügbar.",
     "blacklisted": "Ihr Konto wurde gesperrt. Bitte wenden Sie sich an den Support.",
@@ -221,10 +222,6 @@
     "confirmation_subtitle": "Vielen Dank für Ihre Bestellung. Eine Bestätigung wurde an Ihre E-Mail-Adresse gesendet.",
     "order_number": "Bestellnummer",
     "order_placed": "Ihre Bestellung wurde erfolgreich aufgegeben.",
-    "order_details": "Bestelldetails",
-    "items_total": "{count} Artikel insgesamt",
-    "view_all_items": "Alle {count} Artikel anzeigen",
-    "hide_items": "Artikel ausblenden",
     "items": "Artikel",
     "product": "Produkt",
     "article_number": "Art.-Nr.",
@@ -232,20 +229,12 @@
     "unit_price": "Einzelpreis",
     "line_total": "Gesamt",
     "summary": "Zusammenfassung",
-    "subtotal": "Zwischensumme",
-    "shipping": "Versand",
-    "discount": "Rabatt",
-    "total": "Gesamt",
-    "billing_address": "Rechnungsadresse",
-    "shipping_address": "Lieferadresse",
-    "reference": "Ihre Referenz",
-    "payment_method": "Zahlungsart",
     "view_order_in_portal": "Bestellung im Kundenportal ansehen",
     "back_to_store": "Zurück zum Shop",
     "continue_shopping": "Weiter einkaufen",
     "view_orders": "Meine Bestellungen anzeigen",
     "order_not_found": "Bestellung nicht gefunden.",
-    "buyer": "Käufer"
+    "order_slow": "Das Laden der Bestellung dauert länger als üblich. Sie wird in Kürze im Kundenportal angezeigt."
   },
   "product": {
     "details": "Produktdetails",
@@ -680,14 +669,16 @@
           "title": "Zusätzliche Informationen",
           "your_reference": "Ihre Referenz",
           "goods_label": "Versandkennzeichen",
-          "desired_delivery_date": "Wunschlieferdatum"
+          "desired_delivery_date": "Wunschlieferdatum",
+          "payment_method": "Zahlungsart"
         },
         "billing_address": "Rechnungsdaten",
         "shipping_address": "Lieferadresse",
         "order_message": "Bestellnachricht",
         "order_date": "Bestelldatum",
         "order_status": "Status",
-        "payment_method": "Zahlungsart"
+        "payment_method": "Zahlungsart",
+        "order_slow": "Die Bestellung ist noch nicht da. Wenn Sie sie gerade aufgegeben haben, erscheint sie in Kürze unter Bestellungen."
       }
     },
     "account": {

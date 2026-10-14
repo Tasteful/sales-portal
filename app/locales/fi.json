@@ -30,8 +30,10 @@
     "vat": "ALV",
     "vat_included": "Josta ALV",
     "to_pay_inc_vat": "Maksettava sis. ALV",
+    "payment_fee": "Maksukulu",
     "total_inc_vat": "Yhteensä sis. ALV",
-    "shipping_may_apply": "Voi tulla lisäksi"
+    "shipping_may_apply": "Voi tulla lisäksi",
+    "fetching_order": "Haetaan tilaustasi…"
   },
   "auth": {
     "already_have_account": "Onko sinulla jo tili?",
@@ -173,8 +175,7 @@
       "svea": "Svea",
       "walley": "Walley",
       "avarda": "Avarda",
-      "geins_pay": "Geins Pay",
-      "standard": "Vakiomaksutapa"
+      "geins_pay": "Geins Pay"
     },
     "no_shipping_methods": "Toimitustapoja ei ole saatavilla.",
     "blacklisted": "Tiliäsi on rajoitettu. Ota yhteyttä asiakaspalveluun.",
@@ -221,10 +222,6 @@
     "confirmation_subtitle": "Kiitos tilauksestasi. Vahvistus on lähetetty sähköpostiisi.",
     "order_number": "Tilausnumero",
     "order_placed": "Tilauksesi on lähetetty.",
-    "order_details": "Tilauksen tiedot",
-    "items_total": "Yhteensä {count} tuotetta",
-    "view_all_items": "Näytä kaikki {count} tuotetta",
-    "hide_items": "Piilota tuotteet",
     "items": "Tuotteet",
     "product": "Tuote",
     "article_number": "Tuotenro",
@@ -232,20 +229,12 @@
     "unit_price": "Yksikköhinta",
     "line_total": "Yhteensä",
     "summary": "Yhteenveto",
-    "subtotal": "Välisumma",
-    "shipping": "Toimitus",
-    "discount": "Alennus",
-    "total": "Yhteensä",
-    "billing_address": "Laskutusosoite",
-    "shipping_address": "Toimitusosoite",
-    "reference": "Viitteesi",
-    "payment_method": "Maksutapa",
     "view_order_in_portal": "Näytä tilaus asiakasportaalissa",
     "back_to_store": "Takaisin kauppaan",
     "continue_shopping": "Jatka ostoksia",
     "view_orders": "Näytä tilaukseni",
     "order_not_found": "Tilausta ei löytynyt.",
-    "buyer": "Ostaja"
+    "order_slow": "Tilauksen hakeminen kestää tavallista kauemmin. Se näkyy pian asiakasportaalissa."
   },
   "product": {
     "details": "Tuotetiedot",
@@ -680,14 +669,16 @@
           "title": "Lisätiedot",
           "your_reference": "Viitteenne",
           "goods_label": "Rahtimerkintä",
-          "desired_delivery_date": "Toivottu toimituspäivä"
+          "desired_delivery_date": "Toivottu toimituspäivä",
+          "payment_method": "Maksutapa"
         },
         "billing_address": "Laskutustiedot",
         "shipping_address": "Toimitusosoite",
         "order_message": "Tilausviesti",
         "order_date": "Tilauspäivä",
         "order_status": "Tila",
-        "payment_method": "Maksutapa"
+        "payment_method": "Maksutapa",
+        "order_slow": "Tilaus ei ole vielä näkyvissä. Jos teit sen juuri, se näkyy pian kohdassa Tilaukset."
       }
     },
     "account": {

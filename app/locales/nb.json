@@ -30,8 +30,10 @@
     "vat": "Mva.",
     "vat_included": "Herav mva.",
     "to_pay_inc_vat": "Å betale inkl. mva.",
+    "payment_fee": "Betalingsgebyr",
     "total_inc_vat": "Totalt inkl. mva.",
-    "shipping_may_apply": "Kan tilkomme"
+    "shipping_may_apply": "Kan tilkomme",
+    "fetching_order": "Henter ordren din…"
   },
   "auth": {
     "already_have_account": "Har du allerede en konto?",
@@ -173,8 +175,7 @@
       "svea": "Svea",
       "walley": "Walley",
       "avarda": "Avarda",
-      "geins_pay": "Geins Pay",
-      "standard": "Standardbetaling"
+      "geins_pay": "Geins Pay"
     },
     "no_shipping_methods": "Ingen leveringsmåter tilgjengelig.",
     "blacklisted": "Kontoen din er begrenset. Kontakt kundeservice.",
@@ -221,10 +222,6 @@
     "confirmation_subtitle": "Takk for bestillingen. En bekreftelse er sendt til e-postadressen din.",
     "order_number": "Ordrenummer",
     "order_placed": "Ordren din er lagt inn.",
-    "order_details": "Ordredetaljer",
-    "items_total": "{count} varer totalt",
-    "view_all_items": "Vis alle {count} varer",
-    "hide_items": "Skjul varer",
     "items": "Varer",
     "product": "Produkt",
     "article_number": "Art.nr.",
@@ -232,20 +229,12 @@
     "unit_price": "Enhetspris",
     "line_total": "Totalt",
     "summary": "Sammendrag",
-    "subtotal": "Delsum",
-    "shipping": "Frakt",
-    "discount": "Rabatt",
-    "total": "Totalt",
-    "billing_address": "Fakturaadresse",
-    "shipping_address": "Leveringsadresse",
-    "reference": "Din referanse",
-    "payment_method": "Betalingsmåte",
     "view_order_in_portal": "Vis ordre i kundeportalen",
     "back_to_store": "Tilbake til butikken",
     "continue_shopping": "Fortsett å handle",
     "view_orders": "Vis mine ordrer",
     "order_not_found": "Ordren ble ikke funnet.",
-    "buyer": "Kjøper"
+    "order_slow": "Det tar lengre tid enn vanlig å hente ordren. Den vises i kundeportalen om kort tid."
   },
   "product": {
     "details": "Produktdetaljer",
@@ -680,14 +669,16 @@
           "title": "Tilleggsinformasjon",
           "your_reference": "Deres referanse",
           "goods_label": "Godsmerke",
-          "desired_delivery_date": "Ønsket leveringsdato"
+          "desired_delivery_date": "Ønsket leveringsdato",
+          "payment_method": "Betalingsmåte"
         },
         "billing_address": "Fakturaopplysninger",
         "shipping_address": "Leveringsadresse",
         "order_message": "Ordremelding",
         "order_date": "Ordredato",
         "order_status": "Status",
-        "payment_method": "Betalingsmåte"
+        "payment_method": "Betalingsmåte",
+        "order_slow": "Ordren har ikke dukket opp ennå. Hvis du nettopp la den inn, vises den under Ordrer om kort tid."
       }
     },
     "account": {

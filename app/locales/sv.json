@@ -30,8 +30,10 @@
     "vat": "Moms",
     "vat_included": "Varav moms",
     "to_pay_inc_vat": "Att betala inkl. moms",
+    "payment_fee": "Betalningsavgift",
     "total_inc_vat": "Totalt inkl. moms",
-    "shipping_may_apply": "Kan tillkomma"
+    "shipping_may_apply": "Kan tillkomma",
+    "fetching_order": "Hämtar din order…"
   },
   "auth": {
     "already_have_account": "Har du redan ett konto?",
@@ -173,8 +175,7 @@
       "svea": "Svea",
       "walley": "Walley",
       "avarda": "Avarda",
-      "geins_pay": "Geins Pay",
-      "standard": "Standardbetalning"
+      "geins_pay": "Geins Pay"
     },
     "no_shipping_methods": "Inga leveransmetoder tillgängliga.",
     "blacklisted": "Ditt konto har begränsats. Kontakta support.",
@@ -221,10 +222,6 @@
     "confirmation_subtitle": "Tack för din beställning. En bekräftelse har skickats till din e-postadress.",
     "order_number": "Ordernummer",
     "order_placed": "Din order har lagts.",
-    "order_details": "Orderdetaljer",
-    "items_total": "{count} artiklar totalt",
-    "view_all_items": "Visa alla {count} artiklar",
-    "hide_items": "Dölj artiklar",
     "items": "Artiklar",
     "product": "Produkt",
     "article_number": "Art.nr.",
@@ -232,20 +229,12 @@
     "unit_price": "À-pris",
     "line_total": "Totalt",
     "summary": "Sammanfattning",
-    "subtotal": "Delsumma",
-    "shipping": "Frakt",
-    "discount": "Rabatt",
-    "total": "Totalt",
-    "billing_address": "Fakturaadress",
-    "shipping_address": "Leveransadress",
-    "reference": "Din referens",
-    "payment_method": "Betalningssätt",
     "view_order_in_portal": "Visa order i kundportalen",
     "back_to_store": "Tillbaka till butiken",
     "continue_shopping": "Fortsätt handla",
     "view_orders": "Visa mina ordrar",
     "order_not_found": "Order hittades inte.",
-    "buyer": "Köpare"
+    "order_slow": "Det tar längre än vanligt att hämta ordern. Den visas i kundportalen inom kort."
   },
   "product": {
     "details": "Produktdetaljer",
@@ -680,14 +669,16 @@
           "title": "Ytterligare information",
           "your_reference": "Er referens",
           "goods_label": "Godsmärke",
-          "desired_delivery_date": "Önskat leveransdatum"
+          "desired_delivery_date": "Önskat leveransdatum",
+          "payment_method": "Betalsätt"
         },
         "billing_address": "Fakturauppgifter",
         "shipping_address": "Leveransadress",
         "order_message": "Ordermeddelande",
         "order_date": "Orderdatum",
         "order_status": "Status",
-        "payment_method": "Betalningsmetod"
+        "payment_method": "Betalningsmetod",
+        "order_slow": "Ordern har inte dykt upp än. Har du nyss lagt den visas den under Beställningar inom kort."
       }
     },
     "account": {
