@@ -110,7 +110,6 @@ The shared mount helper at `tests/utils/component.ts` provides global stubs that
 - **`Icon`** — plain render with `data-name` attribute (matches `<Icon name="lucide:..." />`)
 - **`NuxtIcon`** — same shape as Icon. `@nuxt/icon` registers its component as `NuxtIcon`, not `Icon`. Without this stub, `Icon`-keyed stubs are silent no-ops and icon assertions pass vacuously.
 - **`NuxtLink`** — renders as `<a>` with `href` for route assertion
-- **`NuxtImg`** — renders as `<img>` with `src` passthrough
 
 ### Shared test fixtures
 
@@ -489,7 +488,7 @@ describe('myFunction', () => {
 
 ### Component Tests (components tier)
 
-Use the `mountComponent` / `shallowMountComponent` helpers from `tests/utils/component.ts`. They provide default stubs for `NuxtLink`, `NuxtImg`, `Icon`, `ClientOnly` and mocks for `$t`, `$router`, `$route`.
+Use the `mountComponent` / `shallowMountComponent` helpers from `tests/utils/component.ts`. They provide default stubs for `NuxtLink`, `Icon`, `ClientOnly` and mocks for `$t`, `$router`, `$route`.
 
 ```typescript
 import { describe, it, expect } from 'vitest';
@@ -623,6 +622,9 @@ them before concluding the app is broken:
   Accordion (`md:hidden`); the header SearchBar is `hidden … lg:flex`. Elements exist in the DOM
   while invisible, so a click waits forever. Branch on which layout is actually visible, or skip
   on the projects where the affordance does not exist (`test.skip(isMobile, …)`).
+- **Import `test` from `./fixtures`, not `@playwright/test`.** Its automatic fixtures run for
+  every test; on webkit one drops `image/jxl` from library image requests, which Linux WebKit
+  decodes for seconds. Lint enforces it outside the preflight and orders projects.
 - **Hydration.** Anything driven by a Vue handler needs `waitForHydration(page)` first, or the
   click lands on inert SSR markup and nothing happens.
 - **WebKit commits URLs late.** `page.url()` (and `waitForLoadState`) can still report the previous

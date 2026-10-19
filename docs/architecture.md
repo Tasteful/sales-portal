@@ -76,7 +76,7 @@ The Sales Portal is a multi-tenant storefront application built on Nuxt 4, desig
 │   │   ├── shared/             # Reusable cross-page components
 │   │   │   ├── AddressBlock.vue      # Billing/shipping address card (used in quotes + orders)
 │   │   │   ├── ProductThumbnail.vue  # Product image with GeinsImage CDN + fallback icon
-│   │   │   └── GeinsImage.vue        # CDN image builder (type + fileName → full URL)
+│   │   │   └── GeinsImage.vue        # Every product/CMS image: library srcset or legacy raw (docs/patterns/images.md)
 │   │   └── ui/                 # shadcn-vue UI primitives
 │   ├── composables/
 │   │   ├── useTenant.ts        # Tenant data access
@@ -298,7 +298,6 @@ The system identifies tenants based on the request hostname. Each tenant is mapp
                             ↓
 ┌─ render:html ─────────────────────────────────────────────┐
 │  04.tenant-css          data-theme, CSS, favicon, fonts   │
-│  05.strip-img-onerror   strip NuxtImg onerror handler     │
 └───────────────────────────────────────────────────────────┘
 
   'error' / 'beforeResponse' → 01.request-logging
