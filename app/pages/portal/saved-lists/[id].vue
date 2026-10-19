@@ -33,7 +33,10 @@ interface ListProduct {
   alias?: string | null;
   name?: string | null;
   articleNumber?: string | null;
-  productImages?: Array<{ fileName?: string | null } | null> | null;
+  productImages?: Array<{
+    fileName?: string | null;
+    url?: string | null;
+  } | null> | null;
   totalStock?: StockType | null;
   unitPrice?: {
     isDiscounted?: boolean | null;
@@ -408,6 +411,7 @@ function addToCart(product: ListProduct) {
               >
                 <ProductThumbnail
                   :file-name="product.productImages?.[0]?.fileName ?? null"
+                  :url="product.productImages?.[0]?.url ?? null"
                   :alt="product.name ?? ''"
                   size="w-20 self-stretch"
                   radius="rounded-none"
@@ -434,6 +438,7 @@ function addToCart(product: ListProduct) {
               <div v-else class="flex flex-1 items-stretch">
                 <ProductThumbnail
                   :file-name="product.productImages?.[0]?.fileName ?? null"
+                  :url="product.productImages?.[0]?.url ?? null"
                   :alt="product.name ?? ''"
                   size="w-20 self-stretch"
                   radius="rounded-none"

@@ -43,8 +43,17 @@ vi.stubGlobal('useI18n', () => ({ t: translateForTest, locale: ref('en') }));
 
 // Render the alt so tests can read the resolved value off the DOM.
 const geinsImageStub = {
-  template: '<img class="geins-image" :alt="alt" />',
-  props: ['fileName', 'type', 'alt', 'loading'],
+  template:
+    '<img class="geins-image" :alt="alt" :data-url="url" :data-sizes="sizes" :data-priority="String(priority)" />',
+  props: {
+    fileName: String,
+    url: String,
+    type: String,
+    alt: String,
+    loading: String,
+    sizes: String,
+    priority: Boolean,
+  },
 };
 
 const iconStub = {
@@ -96,6 +105,38 @@ describe('ProductGallery', () => {
     const wrapper = mountGallery(makeImages());
     const images = wrapper.findAll('.geins-image');
     expect(images.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('gives the main image its library url and the gallery width, and the lightbox its own', () => {
+    const wrapper = mountGallery([
+      {
+        fileName: 'a.jpg',
+        url: 'https://cdn.example.test/acme/products/a.jpg',
+      },
+    ]);
+    const [main, lightbox] = wrapper.findAll('.geins-image');
+
+    expect(main!.attributes('data-url')).toBe(
+      'https://cdn.example.test/acme/products/a.jpg',
+    );
+    expect(main!.attributes('data-sizes')).toBe(
+      '(min-width: 768px) 400px, calc(100vw - 66px)',
+    );
+    expect(lightbox!.attributes('data-url')).toBe(
+      'https://cdn.example.test/acme/products/a.jpg',
+    );
+    expect(lightbox!.attributes('data-sizes')).toBe(
+      '(min-width: 896px) 896px, 100vw',
+    );
+  });
+
+  it('gives the main image the page’s priority, and not the lightbox', () => {
+    const [main, lightbox] = mountGallery(makeImages(2)).findAll(
+      '.geins-image',
+    );
+
+    expect(main!.attributes('data-priority')).toBe('true');
+    expect(lightbox!.attributes('data-priority')).not.toBe('true');
   });
 
   it('does not render thumbnail strip', () => {

@@ -169,7 +169,8 @@ function onRow() {
 
       <ConfiguratorOptionImage
         v-if="imageColumn"
-        :file-name="image"
+        :file-name="image?.fileName"
+        :url="image?.url"
         :alt="option.name"
       />
 

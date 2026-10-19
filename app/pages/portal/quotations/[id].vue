@@ -118,6 +118,7 @@ const quoteItemRows = computed<PortalItemRow[]>(() =>
     unitPriceFormatted: unitPriceOf(item),
     totalPriceFormatted: totalPriceOf(item),
     imageFileName: item.imageFileName ?? null,
+    imageUrl: item.imageUrl ?? null,
     alias: item.alias ?? null,
   })),
 );
@@ -212,6 +213,7 @@ const quoteTotals = computed<PortalItemTotal[]>(() => {
                       <div class="flex items-center gap-3">
                         <ProductThumbnail
                           :file-name="item.imageFileName"
+                          :url="item.imageUrl"
                           :alt="item.name"
                         />
                         <NuxtLink

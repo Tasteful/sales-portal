@@ -2,6 +2,7 @@
 import type { DetailProduct, ListProduct } from '#shared/types/commerce';
 import { filterVisibleCampaigns, getStockStatus } from '#shared/types/commerce';
 import { productPath } from '#shared/utils/route-helpers';
+import { THUMBNAIL_WIDTHS } from '#shared/utils/image';
 import { BADGE_DESTRUCTIVE } from '~/lib/badge-styles';
 import {
   ShoppingCart,
@@ -27,6 +28,7 @@ import { useFavoritesStore } from '~/stores/favorites';
 export interface ProductCardItem {
   name: string;
   imageFileName?: string | null;
+  imageUrl?: string | null;
   price?: string | number | null;
   salePrice?: string | number | null;
   articleNumber?: string | null;
@@ -41,8 +43,10 @@ const props = withDefaults(
     product: ProductCardProp;
     variant?: 'grid' | 'list';
     isLoading?: boolean;
+    /** Position in a page's main grid; sets how early its image loads. */
+    index?: number;
   }>(),
-  { variant: 'grid', isLoading: false },
+  { variant: 'grid', isLoading: false, index: undefined },
 );
 
 const emit = defineEmits<{
@@ -110,6 +114,22 @@ const imageFileName = computed(() => {
   if (isFullProduct(props.product)) return firstImage.value?.fileName ?? null;
   return props.product.imageFileName ?? null;
 });
+
+const imageUrl = computed(() => {
+  if (isFullProduct(props.product)) return firstImage.value?.url ?? null;
+  return props.product.imageUrl ?? null;
+});
+
+// The first card is the grid's largest image candidate; the rest of the first
+// mobile viewport (four cards) loads eagerly, everything below it lazily.
+const EAGER_CARDS = 4;
+const imageLoading = computed(() =>
+  props.index !== undefined && props.index < EAGER_CARDS ? 'eager' : 'lazy',
+);
+
+// Rendered card width per breakpoint, measured on the product grids.
+const GRID_IMAGE_SIZES =
+  '(min-width: 1440px) 282px, (min-width: 1024px) 20vw, (min-width: 768px) 28vw, 38vw';
 
 const productUrl = computed(() => {
   if (isFullProduct(props.product)) {
@@ -184,9 +204,12 @@ async function addToCart() {
           <GeinsImage
             v-if="imageFileName"
             :file-name="imageFileName"
+            :url="imageUrl"
             type="product"
             :alt="product?.name ?? ''"
-            loading="lazy"
+            :loading="imageLoading"
+            :priority="index === 0"
+            :sizes="GRID_IMAGE_SIZES"
             class="size-full object-contain transition-transform group-hover:scale-105"
           />
           <div
@@ -201,9 +224,12 @@ async function addToCart() {
           <GeinsImage
             v-if="imageFileName"
             :file-name="imageFileName"
+            :url="imageUrl"
             type="product"
             :alt="product?.name ?? ''"
-            loading="lazy"
+            :loading="imageLoading"
+            :priority="index === 0"
+            :sizes="GRID_IMAGE_SIZES"
             class="size-full object-contain transition-transform group-hover:scale-105"
           />
           <div
@@ -408,9 +434,12 @@ async function addToCart() {
           <GeinsImage
             v-if="imageFileName"
             :file-name="imageFileName"
+            :url="imageUrl"
             type="product"
             :alt="product?.name ?? ''"
             loading="lazy"
+            sizes="64px"
+            :widths="THUMBNAIL_WIDTHS"
             class="size-full object-contain"
           />
         </NuxtLink>
@@ -418,9 +447,12 @@ async function addToCart() {
           <GeinsImage
             v-if="imageFileName"
             :file-name="imageFileName"
+            :url="imageUrl"
             type="product"
             :alt="product?.name ?? ''"
             loading="lazy"
+            sizes="64px"
+            :widths="THUMBNAIL_WIDTHS"
             class="size-full object-contain"
           />
         </div>

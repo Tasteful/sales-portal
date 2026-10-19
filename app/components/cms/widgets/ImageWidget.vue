@@ -8,6 +8,8 @@ const props = defineProps<{
   data: ImageWidgetData;
   config: ContentConfigType;
   layout: string;
+  /** The page's first widget: its image is the largest candidate. */
+  priority?: boolean;
 }>();
 
 const imageFileName = computed(() => resolveImageFileName(props.data.image));
@@ -24,7 +26,9 @@ const { localePath } = useLocaleMarket();
     <GeinsImage
       v-if="imageFileName"
       :file-name="imageFileName"
+      :path="data.image?.path"
       type="pagewidget"
+      :priority="priority"
       :alt="data.image?.altText || config.displayName || ''"
     />
   </component>
