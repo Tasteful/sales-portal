@@ -71,7 +71,7 @@ describe('buildImageSources', () => {
     ]);
   });
 
-  it('prefers the url over a path', () => {
+  it('prefers the url over the account host and path', () => {
     const sources = buildImageSources({
       url: LIBRARY,
       path: 'content/other.jpg',
@@ -83,6 +83,24 @@ describe('buildImageSources', () => {
 
     expect(sources.src).toBe(`${LIBRARY}?width=80&format=auto`);
   });
+
+  it.each([null, undefined, '', 'not a url'])(
+    'uses the account host and path when the url is %s',
+    (url) => {
+      const sources = buildImageSources({
+        url,
+        path: 'content/other.jpg',
+        assetBaseUrl: 'https://cdn.example.test/acme',
+        type: 'pagewidget',
+        imageBaseUrl: LEGACY,
+        widths: [80],
+      });
+
+      expect(sources.src).toBe(
+        'https://cdn.example.test/acme/content/other.jpg?width=80&format=auto',
+      );
+    },
+  );
 
   describe('a library path joined to the account base', () => {
     const input = {
@@ -106,6 +124,18 @@ describe('buildImageSources', () => {
           'https://cdn.example.test/acme/content/banner4.jpg?width=80&format=auto 80w',
         origin: 'https://cdn.example.test',
       });
+    });
+
+    it('encodes the path as the asset contract does, then adds the size', () => {
+      const sources = buildImageSources({
+        ...input,
+        assetBaseUrl: 'https://cdn.example.test/acme',
+        path: 'content/image (1)#2.jpg',
+      });
+
+      expect(sources.src).toBe(
+        'https://cdn.example.test/acme/content/image%20%281%29%232.jpg?width=80&format=auto',
+      );
     });
 
     it('keeps the path as given, case included', () => {
