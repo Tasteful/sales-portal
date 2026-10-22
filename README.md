@@ -15,7 +15,7 @@ Multi-tenant storefront application built on Nuxt 4. Serves multiple merchants/b
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 24 (`.nvmrc`)
 - PNPM 9+
 
 ### Setup
@@ -100,8 +100,8 @@ See [`.env.example`](.env.example) for all available configuration. Key variable
 | `NUXT_GEINS_TENANT_API_URL`    | Geins Tenant API URL               | (see file) |
 | `NUXT_STORAGE_DRIVER`          | KV storage (`memory`/`fs`/`redis`) | `memory`   |
 | `NUXT_HEALTH_CHECK_SECRET`     | Secret for detailed `/api/health`  | —          |
-| `NUXT_HEALTH_RSS_DEGRADED_MB`  | RSS above this is `degraded`       | `400`      |
-| `NUXT_HEALTH_RSS_UNHEALTHY_MB` | RSS above this is `unhealthy`      | `900`      |
+| `NUXT_HEALTH_RSS_DEGRADED_MB`  | RSS above this is `degraded`       | `500`      |
+| `NUXT_HEALTH_RSS_UNHEALTHY_MB` | RSS above this is `unhealthy`      | `1200`     |
 | `LOG_LEVEL`                    | Logging verbosity                  | `info`     |
 
 ## Health Check
