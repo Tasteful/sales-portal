@@ -218,3 +218,36 @@ test.describe('Routing', () => {
     expect(after).toBe(before);
   });
 });
+
+// No entity can have an alias this long, so it is a miss like any other: a
+// 404, never the error page a failed read shows.
+test.describe('Over-long alias', () => {
+  const tooLong = 'a'.repeat(201);
+
+  for (const [kind, path] of [
+    ['product', `/p/${tooLong}`],
+    ['category', `/c/${tooLong}`],
+    ['CMS', `/${tooLong}`],
+  ]) {
+    test(`answers 404 on a ${kind} URL`, async ({ page }) => {
+      const response = await page.goto(path);
+      expect(response?.status()).toBe(404);
+    });
+  }
+});
+
+// The server answers a true miss itself, so the document carries a real 404
+// before any client-side recovery could run.
+test.describe('Missing entity', () => {
+  const missing = `e2e-missing-${Date.now()}`;
+
+  for (const [kind, path] of [
+    ['product', `/p/${missing}`],
+    ['category', `/c/${missing}`],
+  ]) {
+    test(`answers 404 on a ${kind} URL`, async ({ page }) => {
+      const response = await page.goto(path);
+      expect(response?.status()).toBe(404);
+    });
+  }
+});
