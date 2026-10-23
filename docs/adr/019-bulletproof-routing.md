@@ -80,14 +80,18 @@ Three guardrails prevent raw entity-URL literals from bypassing the builders:
 ### Pillar 2: one cached resolver, two tiers
 
 `server/api/resolve-url.get.ts` is a `defineCachedEventHandler` (SWR,
-`maxAge: 60`, `staleMaxAge: 300`). Its cache key is `{host}::{normalizedPath}`
-(lower-cased, trailing-slash stripped) so two tenants sharing an alias never
-collide. It returns a normalized shape:
+`maxAge: 60`, `staleMaxAge: 300`). Its cache key is a sha256 of
+`{host}::{normalizedPath}` (lower-cased, trailing-slash stripped) so two
+tenants sharing an alias never collide; hashed because Nitro strips every
+non-word character from a custom key. It returns a normalized shape:
 `{ type, canonicalAppPath }` (typed hit), `{ redirect }` (renamed slug via
 `urlHistory`), or a `{ notFound: true }` marker. The notFound marker is
 returned rather than thrown so Nitro caches the miss for the SWR TTL (a thrown
 error is not cached and re-hammers Geins on every scan request). The thin outer
 `defineEventHandler` wrapper converts the marker to a real 404 for callers.
+The entries live on their own LRU storage mount capped at 1000
+(`server/utils/resolve-url-cache.ts`), not on Nitro's default `cache` mount,
+which never evicts.
 This closes the negative-cache follow-up that ADR-017 deferred.
 
 The resolver resolves in the URL's OWN market/locale, not the request default.
@@ -229,7 +233,8 @@ does not affect the weight of those tags.
 - **Faster.** The path-shape guard in the global middleware makes the common
   case (already-correct typed path) zero-cost. The SWR cache absorbs crawler
   bursts and repeated navigations; the negative-cache marker means a bad URL
-  runs at most one Geins round-trip per `staleMaxAge` window.
+  runs at most one Geins round-trip per `maxAge` window (60 s, revalidated in
+  the background), plus one after its entry is evicted.
 - **Crawler-correct.** A real 301 or 404 is issued on document load. The
   correct `rel=canonical` and per-locale hreflang are emitted from the real
   localized slugs. `<html lang>`, `og:locale`, and schema.org `inLanguage` are

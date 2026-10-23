@@ -5,6 +5,7 @@ import { Socket } from 'node:net';
 import { ZodError } from 'zod';
 import { createEvent, handleCacheHeaders } from 'h3';
 import type { H3Event } from 'h3';
+import { RESOLVE_URL_CACHE_BASE } from '../../../server/utils/resolve-url-cache';
 
 // ---------------------------------------------------------------------------
 // Mock the resolver service (the boundary the endpoint calls). Real zod runs.
@@ -20,6 +21,7 @@ vi.mock('../../../server/services/url-resolver', () => ({
 // and immediately returns the inner fn so the endpoint behaves normally.
 let capturedInnerHandler: ((event: H3Event) => Promise<unknown>) | null = null;
 let capturedGetKey: ((event: H3Event) => string) | null = null;
+let capturedBase: string | undefined;
 type CachedCall = (
   fn: (event: H3Event) => Promise<unknown>,
   event: H3Event,
@@ -43,10 +45,11 @@ vi.stubGlobal(
   'defineCachedEventHandler',
   (
     fn: (event: H3Event) => Promise<unknown>,
-    opts: { getKey?: (event: H3Event) => string },
+    opts: { getKey?: (event: H3Event) => string; base?: string },
   ) => {
     capturedInnerHandler = fn;
     capturedGetKey = opts.getKey ?? null;
+    capturedBase = opts.base;
     // Return a thin wrapper that runs the inner fn directly (no real caching in tests).
     return (event: H3Event) => cachedCall(fn, event);
   },
@@ -123,6 +126,7 @@ describe('GET /api/resolve-url', () => {
     vi.clearAllMocks();
     capturedInnerHandler = null;
     capturedGetKey = null;
+    capturedBase = undefined;
     (optionalAuth as ReturnType<typeof vi.fn>).mockResolvedValue(null);
     vi.resetModules();
     const mod = await import('../../../server/api/resolve-url.get');
@@ -210,7 +214,11 @@ describe('GET /api/resolve-url', () => {
     );
   });
 
-  it('getKey varies by host: same path under two tenants produces distinct cache keys including the path', async () => {
+  it('caches on the resolver mount, not on the unbounded default cache mount', () => {
+    expect(capturedBase).toBe(RESOLVE_URL_CACHE_BASE);
+  });
+
+  it('getKey varies by host and by path', async () => {
     (getQuery as ReturnType<typeof vi.fn>).mockReturnValue({
       path: '/se/sv/grenror',
     });
@@ -229,10 +237,62 @@ describe('GET /api/resolve-url', () => {
     const keyB = capturedGetKey!(eventB);
 
     expect(keyA).not.toBe(keyB);
-    expect(keyA).toContain('alpha.example');
-    expect(keyB).toContain('beta.example');
-    // Path must also be present in the key so a host-only key bug would fail.
-    expect(keyA).toContain('/se/sv/grenror');
+
+    // A host-only key would give every path of a tenant one entry.
+    (getQuery as ReturnType<typeof vi.fn>).mockReturnValue({
+      path: '/se/sv/verktyg',
+    });
+    expect(capturedGetKey!(eventA)).not.toBe(keyA);
+  });
+
+  // Nitro stores a custom key with every non-word character removed
+  // (escapeKey in nitropack's runtime/internal/cache.mjs).
+  const storedKey = (key: string) => key.replace(/\W/g, '');
+  const storedKeyFor = (host: string, path: string) => {
+    (getQuery as ReturnType<typeof vi.fn>).mockReturnValue({ path });
+    return storedKey(capturedGetKey!(createMockEvent(host)));
+  };
+
+  it("stores two paths that differ only by '-' under two keys", async () => {
+    await handler(createMockEvent());
+
+    expect(storedKeyFor('alpha.example', '/se/sv/foo-bar')).not.toBe(
+      storedKeyFor('alpha.example', '/se/sv/foobar'),
+    );
+  });
+
+  it('stores two hosts that differ only by a dot under two keys', async () => {
+    await handler(createMockEvent());
+
+    expect(storedKeyFor('ab.example', '/se/sv/foo')).not.toBe(
+      storedKeyFor('a.bexample', '/se/sv/foo'),
+    );
+  });
+
+  it('stores a fixed-length key however long the host and path are', async () => {
+    await handler(createMockEvent());
+
+    const short = storedKeyFor('a.example', '/se/sv/a');
+    const long = storedKeyFor(
+      `${'h'.repeat(60)}.example`,
+      `/${'p'.repeat(499)}`,
+    );
+    expect(long).toHaveLength(short.length);
+  });
+
+  it('folds case and every trailing slash into one key', async () => {
+    await handler(createMockEvent());
+
+    expect(storedKeyFor('alpha.example', '/Se/Sv/Grenror//')).toBe(
+      storedKeyFor('alpha.example', '/se/sv/grenror'),
+    );
+  });
+
+  it('returns a key for a request without a path, so zod can answer it', async () => {
+    await handler(createMockEvent());
+
+    (getQuery as ReturnType<typeof vi.fn>).mockReturnValue({});
+    expect(() => capturedGetKey!(createMockEvent())).not.toThrow();
   });
 
   it('getKey normalizes trailing slashes: /se/sv/grenror/ and /se/sv/grenror produce equal keys', async () => {

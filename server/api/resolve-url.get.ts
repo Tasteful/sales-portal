@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { ResolveUrlSchema } from '../schemas/api-input';
 import { resolveEntityUrl } from '../services/url-resolver';
 import {
@@ -5,20 +6,26 @@ import {
   resolveLocaleMarket,
 } from '#shared/utils/locale-market';
 import type { TenantConfig } from '#shared/types/tenant-config';
+import { RESOLVE_URL_CACHE_BASE } from '../utils/resolve-url-cache';
 
 /**
  * Inbound URL resolver endpoint: the 404-miss safety net.
  *
  * Caching behaviour:
  *  - Wrapped in `defineCachedEventHandler` with SWR (stale-while-revalidate).
- *  - Cache key: `{host}::{normalizedPath}` where host is tenant-specific so two
- *    tenants sharing a path never collide. The key has no identity, so the
- *    lookup runs anonymously, deliberately: Nitro copies the incoming context
- *    into the cached handler, and a session read in here would populate an
- *    entry every caller shares. If the mapping ever differs for signed-in
- *    callers, the key needs an identity segment first.
+ *  - Cache key: sha256 of `{host}::{normalizedPath}`, so two tenants sharing a
+ *    path never collide. Hashed because Nitro strips every non-word character
+ *    from a custom key (`foo-bar` and `foobar` would share an entry), and a
+ *    fixed length keeps a long path within the fs driver's filename limit.
+ *    The key has no identity, so the lookup runs anonymously, deliberately:
+ *    Nitro copies the incoming context into the cached handler, and a session
+ *    read in here would populate an entry every caller shares. If the mapping
+ *    ever differs for signed-in callers, the key needs an identity segment
+ *    first.
  *  - Trailing-slash policy: the path is lower-cased and trailing slashes are
  *    stripped so `/Se/Sv/Grenror/` and `/se/sv/grenror` share one cache entry.
+ *  - Entries live on their own LRU mount (server/utils/resolve-url-cache.ts),
+ *    not on Nitro's default `cache` mount, which never evicts.
  *
  * Negative caching:
  *  - When the resolver returns null (no entity found), the handler RETURNS a
@@ -113,9 +120,10 @@ const cachedResolver = defineCachedEventHandler(
     // absorbs crawler bursts while ensuring a newly published entity resolves
     // within a minute.
     maxAge: 60,
-    // staleMaxAge bounds the in-memory negative-cache entry lifetime so a path
-    // scanner cannot grow the heap unbounded with entries that never revalidate.
+    // With swr, staleMaxAge only sets stale-while-revalidate in Cache-Control;
+    // it does not expire the stored entry. The mount's LRU cap bounds memory.
     staleMaxAge: 300,
+    base: RESOLVE_URL_CACHE_BASE,
     getKey: (event) => {
       // Parse path from the query so normalization matches what the handler sees.
       const query = getQuery(event);
@@ -127,7 +135,9 @@ const cachedResolver = defineCachedEventHandler(
       // Include host in the key for tenant isolation: two tenants sharing the
       // same path must not share a cache entry (different canonical targets).
       const host = getResolverHost(event);
-      return `${host}::${normalizedPath}`;
+      return createHash('sha256')
+        .update(`${host}::${normalizedPath}`)
+        .digest('hex');
     },
   },
 );
