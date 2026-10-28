@@ -21,7 +21,7 @@ const emit = defineEmits<{
   close: [];
 }>();
 
-const { features } = useTenant();
+const { features, hasFeature } = useTenant();
 
 // Fail-open: missing key, missing features map, or missing tenant all default
 // to enabled. Only an explicit `registration.enabled === false` disables.
@@ -82,7 +82,7 @@ defineExpose({ switchToForgot });
           <!-- Login form slot -->
           <slot name="login" />
 
-          <template v-if="registrationEnabled">
+          <template v-if="hasFeature('applyForAccount') && applyResolved">
             <!-- Divider -->
             <div class="relative my-6">
               <Separator />
@@ -104,7 +104,6 @@ defineExpose({ switchToForgot });
 
             <!-- Apply for account link -->
             <NuxtLink
-              v-if="applyResolved"
               :to="applyTo"
               class="border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex h-9 w-full items-center justify-center rounded-md border px-4 py-2 text-sm font-medium transition-colors"
               data-testid="auth-apply-button"
