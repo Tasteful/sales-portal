@@ -14,7 +14,9 @@
  * - Storage connectivity (KV/Redis)
  * - Memory usage details
  * - Uptime information
- * - GET /api/health?key=YOUR_SECRET
+ * - GET /api/health?key=YOUR_SECRET (`NUXT_HEALTH_CHECK_SECRET`)
+ * - In Litium Cloud instead: GET /api/health with header
+ *   `x-api-key: <LITIUMCLOUD_HEALTH_TOKEN>`, which its probes send
  *
  * Used by:
  * - Azure App Service health probes (public)
@@ -31,6 +33,10 @@ import {
   resolveRssThresholds,
 } from '../utils/health-memory';
 import { isDevMode } from '../utils/dev-mode';
+import {
+  isRunningInLitiumCloud,
+  litiumCloudHealthToken,
+} from '../utils/litium-cloud';
 
 /**
  * Health check result for individual components
@@ -62,6 +68,25 @@ interface HealthResponseDetailed extends HealthResponseMinimal {
     storage?: ComponentHealth;
     memory?: ComponentHealth;
   };
+}
+
+/**
+ * Whether the caller may see the detailed response. In Litium Cloud the
+ * platform's probes present `LITIUMCLOUD_HEALTH_TOKEN` as `x-api-key`;
+ * elsewhere the `key` query parameter must match `NUXT_HEALTH_CHECK_SECRET`.
+ */
+function isAuthorizedForDetails(
+  event: H3Event,
+  healthCheckSecret: string | undefined,
+): boolean {
+  if (isRunningInLitiumCloud()) {
+    const token = litiumCloudHealthToken();
+    return !!token && getHeader(event, 'x-api-key') === token;
+  }
+  const providedKey = getQuery(event).key as string | undefined;
+  return (
+    !!healthCheckSecret && !!providedKey && providedKey === healthCheckSecret
+  );
 }
 
 async function getEnvironment(event: H3Event): Promise<string> {
@@ -235,11 +260,10 @@ export default defineEventHandler(
     const query = getQuery(event);
 
     // Check if authorized for detailed metrics (secret key provided)
-    const providedKey = query.key as string | undefined;
-    const isAuthorized =
-      !!config.healthCheckSecret &&
-      !!providedKey &&
-      providedKey === config.healthCheckSecret;
+    const isAuthorized = isAuthorizedForDetails(
+      event,
+      config.healthCheckSecret as string | undefined,
+    );
 
     // Quick mode: Skip storage check for faster response during startup/load balancer checks
     // This is useful for Azure App Service health probes that need fast responses

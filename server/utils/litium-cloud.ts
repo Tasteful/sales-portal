@@ -10,6 +10,14 @@ export function isRunningInLitiumCloud(): boolean {
 }
 
 /**
+ * The key Litium Cloud's health probes send in the `x-api-key` header, from
+ * `LITIUMCLOUD_HEALTH_TOKEN`. `undefined` when unset or empty.
+ */
+export function litiumCloudHealthToken(): string | undefined {
+  return process.env.LITIUMCLOUD_HEALTH_TOKEN || undefined;
+}
+
+/**
  * The first entry of a comma-separated forwarding header, trimmed. Node joins
  * a repeated header with `, `; an array (never sent for these headers, but
  * allowed by the type) is read the same way. `''` when the header is absent.
