@@ -1,11 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { lookupHostname } from '../../../server/utils/lookup-hostname';
 
 /**
- * The function reads nothing but its argument — no mode, no config — so these
- * cases are the whole contract. That it stays on in a production build is
- * proved where it can actually be observed: "rewrites with dev mode off too"
- * in tests/server/plugins/02.tenant-context.test.ts.
+ * Apart from `TENANT_LOOKUP_HOSTNAME`, the function reads nothing but its
+ * argument — no mode, no config — so these cases are the whole contract. That
+ * it stays on in a production build is proved where it can actually be
+ * observed: "rewrites with dev mode off too" in
+ * tests/server/plugins/02.tenant-context.test.ts.
  */
 
 describe('lookupHostname', () => {
@@ -37,5 +38,37 @@ describe('lookupHostname', () => {
     expect(lookupHostname('preview.example.litium.test')).toBe(
       'preview.example.litium.store',
     );
+  });
+
+  describe('with TENANT_LOOKUP_HOSTNAME set', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('looks every host up by the override', () => {
+      vi.stubEnv('TENANT_LOOKUP_HOSTNAME', ' sonoralab.litium.store ');
+
+      for (const hostname of [
+        'shop.example.com',
+        'other.litium.test',
+        'localhost',
+      ]) {
+        expect(lookupHostname(hostname), hostname).toBe(
+          'sonoralab.litium.store',
+        );
+      }
+    });
+
+    it('rewrites a .litium.test override like any other host', () => {
+      vi.stubEnv('TENANT_LOOKUP_HOSTNAME', 'sonoralab.litium.test');
+
+      expect(lookupHostname('shop.example.com')).toBe('sonoralab.litium.store');
+    });
+
+    it('ignores a blank override', () => {
+      vi.stubEnv('TENANT_LOOKUP_HOSTNAME', '  ');
+
+      expect(lookupHostname('shop.example.com')).toBe('shop.example.com');
+    });
   });
 });

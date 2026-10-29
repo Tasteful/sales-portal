@@ -634,6 +634,25 @@ describe('server/plugins/02.tenant-context', () => {
       );
     });
 
+    it('looks a loopback host up when TENANT_LOOKUP_HOSTNAME names the store', async () => {
+      vi.stubEnv('TENANT_LOOKUP_HOSTNAME', 'sonoralab.litium.test');
+      mockGetRequestHost.mockReturnValue('localhost:3000');
+      mockResolveTenant.mockResolvedValue(makeTenant());
+      const event = createEvent('/se/sv/', {});
+
+      await handler(event);
+      vi.unstubAllEnvs();
+
+      expect(event.context.tenantRefusal).toBeUndefined();
+      expect(mockResolveTenant).toHaveBeenCalledWith(
+        'sonoralab.litium.store',
+        event,
+      );
+      expect((event.context.tenant as { hostname: string }).hostname).toBe(
+        'localhost',
+      );
+    });
+
     it('leaves a tenant hostname alone', async () => {
       mockGetRequestHost.mockReturnValue('example.litium.test');
       mockResolveTenant.mockResolvedValue(makeTenant());

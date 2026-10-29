@@ -5,7 +5,10 @@ import {
   resolvePreviewTenant,
   type TenantResolution,
 } from '../utils/tenant';
-import { lookupHostname } from '../utils/lookup-hostname';
+import {
+  lookupHostname,
+  lookupHostnameOverride,
+} from '../utils/lookup-hostname';
 import { isLoopbackHost } from '../utils/loopback-host';
 import { isDevMode } from '../utils/dev-mode';
 import { tenantRefusal } from '../utils/tenant-refusal';
@@ -83,7 +86,12 @@ export default defineNitroPlugin((nitroApp) => {
     // `normalizeHostname` cannot express the IPv6 literal (see
     // `isLoopbackHost`). Placed after the health/internal skip above: the
     // container health check probes `http://localhost:3000/api/health`.
-    if (isDevMode() && isLoopbackHost(rawHostname ?? '')) {
+    // `TENANT_LOOKUP_HOSTNAME` names the store for every host, this one too.
+    if (
+      isDevMode() &&
+      isLoopbackHost(rawHostname ?? '') &&
+      !lookupHostnameOverride()
+    ) {
       event.context.tenant = { hostname };
       event.context.tenantRefusal = {
         statusCode: 404,
@@ -95,7 +103,8 @@ export default defineNitroPlugin((nitroApp) => {
       return;
     }
 
-    // A `.litium.test` host is looked up as `.litium.store` — see
+    // A `.litium.test` host is looked up as `.litium.store`, and
+    // `TENANT_LOOKUP_HOSTNAME` replaces the host outright — see
     // `lookupHostname`. The context below keeps the hostname the browser asked
     // for; only the lookup moves.
     const lookupHost = lookupHostname(hostname);

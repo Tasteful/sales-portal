@@ -232,6 +232,16 @@ environment can ever receive one. The one thing the rewrite takes away is a tena
 lookup resolves `X.litium.store` instead, and only local and CI traffic can carry such a name
 anyway.
 
+### Pinning every host to one store
+
+Set `TENANT_LOOKUP_HOSTNAME` to look every request up by that one name, whatever host it arrived
+on: `TENANT_LOOKUP_HOSTNAME=sonoralab.litium.store pnpm dev` serves the sonoralab store on
+`localhost`, on any `*.litium.test` name and on any other hostname pointed at the server. It is
+read at runtime, so a built image honours it too. The `.litium.test` rewrite applies to the
+override like any other name, and only the lookup moves: the context, cookies and redirects keep
+the host the browser asked for. Leave it unset on a multi-tenant deployment; with it set, the
+deployment serves one store only.
+
 ### Environment
 
 No environment variable is required to browse a tenant. `runtimeConfig.geins.tenantApiUrl` in

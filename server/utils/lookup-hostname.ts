@@ -9,8 +9,23 @@ const LOCAL_SUFFIX = '.litium.test';
 const LOOKUP_SUFFIX = '.litium.store';
 
 /**
+ * `TENANT_LOOKUP_HOSTNAME`, trimmed, or `undefined` when unset or blank.
+ *
+ * A testing aid: when set, every request looks its tenant up by this name,
+ * whatever host it arrived on, so any number of hostnames (and `localhost`)
+ * all serve the same store. Read at runtime so a built image honours it.
+ */
+export function lookupHostnameOverride(): string | undefined {
+  return process.env.TENANT_LOOKUP_HOSTNAME?.trim() || undefined;
+}
+
+/**
  * The hostname to look the tenant up by, which is not always the hostname the
  * browser asked for.
+ *
+ * `TENANT_LOOKUP_HOSTNAME` (see {@link lookupHostnameOverride}) replaces the
+ * request's hostname outright when it is set; the suffix rewrite below then
+ * applies to whichever name is used.
  *
  * The merchant API only knows a tenant's real hostnames, so a developer who
  * types `name.litium.test` would get a 404 for every tenant that does not also
@@ -36,6 +51,7 @@ const LOOKUP_SUFFIX = '.litium.store';
  * cookies, redirects, the tenant logger and the 404 body all stay on it.
  */
 export function lookupHostname(hostname: string): string {
-  if (!hostname.endsWith(LOCAL_SUFFIX)) return hostname;
-  return hostname.slice(0, -LOCAL_SUFFIX.length) + LOOKUP_SUFFIX;
+  const host = lookupHostnameOverride() ?? hostname;
+  if (!host.endsWith(LOCAL_SUFFIX)) return host;
+  return host.slice(0, -LOCAL_SUFFIX.length) + LOOKUP_SUFFIX;
 }

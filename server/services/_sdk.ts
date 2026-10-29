@@ -11,6 +11,7 @@ import type { H3Event } from 'h3';
 import { LRUCache } from 'lru-cache';
 import { geinsRequestConfig } from '../utils/outbound-timeouts';
 import { storefrontCacheKey, storefrontKey } from '../utils/tenant';
+import { lookupHostname } from '../utils/lookup-hostname';
 import { resolveConfiguratorBackendName } from './configurator-backend-name';
 import {
   readConfiguratorBackendValue,
@@ -238,9 +239,11 @@ export async function getTenantSDK(event: H3Event): Promise<TenantSDK> {
     return cached;
   }
 
-  // Prefer the config already resolved by 02.tenant-context plugin
+  // Prefer the config already resolved by 02.tenant-context plugin; a fallback
+  // lookup goes by the same name the plugin's would.
   const tenant =
-    event.context.tenant.config ?? (await resolveTenant(hostname, event));
+    event.context.tenant.config ??
+    (await resolveTenant(lookupHostname(hostname), event));
   if (!tenant?.geinsSettings) {
     throw createAppError(
       ErrorCode.BAD_REQUEST,

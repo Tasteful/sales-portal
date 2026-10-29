@@ -504,6 +504,7 @@ See [`.env.example`](https://github.com/geins-io/sales-portal/blob/main/.env.exa
 | `NUXT_PUBLIC_FEATURES_ANALYTICS` | Enable analytics scripts                                                                                                   | `false`                                |
 | `RUNNING_IN_LITIUM_CLOUD`        | `true` behind the Litium Cloud edge: host from `X-Forwarded-Host`, https, client IP from the first `X-Forwarded-For` entry | —                                      |
 | `LITIUMCLOUD_HEALTH_TOKEN`       | In Litium Cloud, the `x-api-key` that unlocks the detailed `/api/health` instead of `NUXT_HEALTH_CHECK_SECRET`             | —                                      |
+| `TENANT_LOOKUP_HOSTNAME`         | Testing aid: every request looks its tenant up by this hostname, whatever host it arrived on                               | —                                      |
 
 ### Runtime Configuration
 
