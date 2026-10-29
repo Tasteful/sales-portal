@@ -2,6 +2,7 @@ import { isIP } from 'node:net';
 import type { H3Event } from 'h3';
 import { getHeader } from 'h3';
 import { logger } from './logger';
+import { firstForwardedEntry, isRunningInLitiumCloud } from './litium-cloud';
 
 /**
  * Rate limiter configuration options
@@ -145,8 +146,11 @@ function stripPort(entry: string): string {
 /**
  * The client address a limit is keyed on.
  *
- * `runtimeConfig.trustedProxyHops` is the trust boundary: the number of
- * proxies in front of the app that append to `X-Forwarded-For`. Azure App
+ * In Litium Cloud (`RUNNING_IN_LITIUM_CLOUD=true`) the Fastly edge sets
+ * `X-Forwarded-For`, so its first entry is the client and is trusted as is.
+ *
+ * Elsewhere `runtimeConfig.trustedProxyHops` is the trust boundary: the number
+ * of proxies in front of the app that append to `X-Forwarded-For`. Azure App
  * Service is one, and it appends `ip:port` to whatever the client sent, so
  * every entry left of the one it wrote is client-chosen. With N hops the key
  * is the Nth entry from the right, port stripped. With 0 (local dev, e2e) the
@@ -154,9 +158,14 @@ function stripPort(entry: string): string {
  * never to the leftmost entry.
  */
 export function getClientIp(event: H3Event): string {
-  const hops = Number(useRuntimeConfig(event).trustedProxyHops) || 0;
   const forwardedFor = getHeader(event, 'x-forwarded-for');
 
+  if (isRunningInLitiumCloud()) {
+    const ip = stripPort(firstForwardedEntry(forwardedFor));
+    return isIP(ip) ? ip : event.node.req.socket.remoteAddress || 'unknown';
+  }
+
+  const hops = Number(useRuntimeConfig(event).trustedProxyHops) || 0;
   if (hops > 0 && forwardedFor) {
     const entries = forwardedFor.split(',');
     const entry = entries[entries.length - hops];

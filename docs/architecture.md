@@ -489,19 +489,20 @@ The `server/api/external/[...].ts` handler proxies requests to external APIs wit
 
 See [`.env.example`](https://github.com/geins-io/sales-portal/blob/main/.env.example) for the full list. Key variables:
 
-| Variable                         | Description                                                | Default                                |
-| -------------------------------- | ---------------------------------------------------------- | -------------------------------------- |
-| `NUXT_GEINS_API_ENDPOINT`        | Geins GraphQL endpoint                                     | `https://merchantapi.geins.io/graphql` |
-| `NUXT_GEINS_TENANT_API_URL`      | Geins Tenant API URL (server-only)                         | —                                      |
-| `NUXT_STORAGE_DRIVER`            | KV storage driver (`memory`/`fs`/`redis`)                  | `memory`                               |
-| `NUXT_STORAGE_REDIS_URL`         | Redis connection URL                                       | —                                      |
-| `NUXT_HEALTH_CHECK_SECRET`       | Secret for detailed `/api/health` metrics                  | —                                      |
-| `NUXT_HEALTH_RSS_DEGRADED_MB`    | RSS above this reports `degraded`                          | `500`                                  |
-| `NUXT_HEALTH_RSS_UNHEALTHY_MB`   | RSS above this reports `unhealthy` (503)                   | `1200`                                 |
-| `NUXT_WEBHOOK_SECRET`            | Webhook signature verification secret                      | —                                      |
-| `NUXT_SENTRY_DSN`                | Sentry DSN (server-only)                                   | —                                      |
-| `LOG_LEVEL`                      | Logging verbosity (`debug`/`info`/`warn`/`error`/`silent`) | `info`                                 |
-| `NUXT_PUBLIC_FEATURES_ANALYTICS` | Enable analytics scripts                                   | `false`                                |
+| Variable                         | Description                                                                                                                | Default                                |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `NUXT_GEINS_API_ENDPOINT`        | Geins GraphQL endpoint                                                                                                     | `https://merchantapi.geins.io/graphql` |
+| `NUXT_GEINS_TENANT_API_URL`      | Geins Tenant API URL (server-only)                                                                                         | —                                      |
+| `NUXT_STORAGE_DRIVER`            | KV storage driver (`memory`/`fs`/`redis`)                                                                                  | `memory`                               |
+| `NUXT_STORAGE_REDIS_URL`         | Redis connection URL                                                                                                       | —                                      |
+| `NUXT_HEALTH_CHECK_SECRET`       | Secret for detailed `/api/health` metrics                                                                                  | —                                      |
+| `NUXT_HEALTH_RSS_DEGRADED_MB`    | RSS above this reports `degraded`                                                                                          | `500`                                  |
+| `NUXT_HEALTH_RSS_UNHEALTHY_MB`   | RSS above this reports `unhealthy` (503)                                                                                   | `1200`                                 |
+| `NUXT_WEBHOOK_SECRET`            | Webhook signature verification secret                                                                                      | —                                      |
+| `NUXT_SENTRY_DSN`                | Sentry DSN (server-only)                                                                                                   | —                                      |
+| `LOG_LEVEL`                      | Logging verbosity (`debug`/`info`/`warn`/`error`/`silent`)                                                                 | `info`                                 |
+| `NUXT_PUBLIC_FEATURES_ANALYTICS` | Enable analytics scripts                                                                                                   | `false`                                |
+| `RUNNING_IN_LITIUM_CLOUD`        | `true` behind the Litium Cloud edge: host from `X-Forwarded-Host`, https, client IP from the first `X-Forwarded-For` entry | —                                      |
 
 ### Runtime Configuration
 

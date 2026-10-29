@@ -479,6 +479,61 @@ describe('getClientIp', () => {
     });
   });
 
+  describe('in Litium Cloud (RUNNING_IN_LITIUM_CLOUD=true)', () => {
+    beforeEach(() => {
+      vi.stubEnv('RUNNING_IN_LITIUM_CLOUD', 'true');
+      // The edge decides, not the hop count: a stale setting must not apply.
+      withHops(1);
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('should take the first entry, not the one a later proxy appended', () => {
+      const event = createMockEvent(
+        { 'x-forwarded-for': '203.0.113.9, 10.0.0.5:5000' },
+        SOCKET,
+      );
+
+      expect(getClientIp(event)).toBe('203.0.113.9');
+    });
+
+    it('should strip the port from the first entry', () => {
+      const event = createMockEvent(
+        { 'x-forwarded-for': '[2001:db8::1]:52066, 10.0.0.5' },
+        SOCKET,
+      );
+
+      expect(getClientIp(event)).toBe('2001:db8::1');
+    });
+
+    it('should fall back to the socket address when the first entry is not an IP', () => {
+      const event = createMockEvent(
+        { 'x-forwarded-for': 'shop.example.com, 203.0.113.9' },
+        SOCKET,
+      );
+
+      expect(getClientIp(event)).toBe(SOCKET);
+    });
+
+    it('should use the socket address when no header is sent', () => {
+      expect(getClientIp(createMockEvent({}, SOCKET))).toBe(SOCKET);
+    });
+  });
+
+  it('should keep the hop rule when RUNNING_IN_LITIUM_CLOUD is not exactly true', () => {
+    vi.stubEnv('RUNNING_IN_LITIUM_CLOUD', '1');
+    withHops(1);
+    const event = createMockEvent(
+      { 'x-forwarded-for': '203.0.113.9, 5.150.209.218:52066' },
+      SOCKET,
+    );
+
+    expect(getClientIp(event)).toBe('5.150.209.218');
+    vi.unstubAllEnvs();
+  });
+
   it('should return unknown when no IP can be determined', () => {
     expect(getClientIp(createMockEvent({}, undefined))).toBe('unknown');
   });

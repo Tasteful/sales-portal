@@ -430,8 +430,9 @@ Pre-configured limiters: `loginRateLimiter` (5 failed logins/min), `registerRate
 
 `getClientIp` keys on the `X-Forwarded-For` entry the trusted proxy appended, port stripped, and
 ignores what the client sent itself. `NUXT_TRUSTED_PROXY_HOPS` says how many proxies append (1 on
-Azure App Service, 0 locally, where the connection address is used). To count only failures, as
-login does, `check` up front and `refund(key)` on success.
+Azure App Service, 0 locally, where the connection address is used). In Litium Cloud
+(`RUNNING_IN_LITIUM_CLOUD=true`) the Fastly edge sets the header, so the first entry is the client.
+To count only failures, as login does, `check` up front and `refund(key)` on success.
 
 ### Structured Logging
 

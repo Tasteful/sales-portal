@@ -59,6 +59,8 @@ export default defineNitroPlugin((nitroApp) => {
 
     // Get the request host for dynamic request routing
     // without considering the `X-Forwarded-Host` header which could be spoofed.
+    // In Litium Cloud, `00.litium-cloud-proxy` has already moved the edge's
+    // `X-Forwarded-Host` into `Host`.
     const rawHostname = getRequestHost(event, { xForwardedHost: false });
     const hostname = normalizeHostname(rawHostname ?? '');
 

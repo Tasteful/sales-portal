@@ -123,7 +123,8 @@ Body:
 **Negative:**
 
 - Rate limiting (10 req/min per IP) keys on the client address App Service appends to
-  `X-Forwarded-For` (`NUXT_TRUSTED_PROXY_HOPS`); entries the client sends itself are ignored
+  `X-Forwarded-For` (`NUXT_TRUSTED_PROXY_HOPS`); entries the client sends itself are ignored.
+  In Litium Cloud the edge sets the header and its first entry is used
 - Requires coordination with Geins to configure the shared secret
 - Single shared secret (not per-tenant) — compromise means all tenants are affected
 - Rate limiter uses KV storage (`useStorage('kv')`), currently a per-process memory store, so
