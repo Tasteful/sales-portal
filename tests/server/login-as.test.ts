@@ -1,5 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { H3Event } from 'h3';
+
+const mockCopyCart = vi.fn();
+vi.mock('../../server/services/cart', () => ({
+  copyCart: (...args: unknown[]) => mockCopyCart(...args),
+}));
 
 vi.mock('../../server/utils/logger', () => ({
   logger: {
@@ -31,6 +36,7 @@ vi.stubGlobal('createAppError', createAppErrorMock);
 vi.stubGlobal('ErrorCode', {
   BAD_REQUEST: 'BAD_REQUEST',
   UNAUTHORIZED: 'UNAUTHORIZED',
+  CART_NOT_OWN: 'CART_NOT_OWN',
 });
 vi.stubGlobal(
   'defineEventHandler',
@@ -62,6 +68,7 @@ async function importHandler() {
   vi.stubGlobal('ErrorCode', {
     BAD_REQUEST: 'BAD_REQUEST',
     UNAUTHORIZED: 'UNAUTHORIZED',
+    CART_NOT_OWN: 'CART_NOT_OWN',
   });
   vi.stubGlobal(
     'defineEventHandler',
@@ -72,6 +79,9 @@ async function importHandler() {
   const freshCookies = await import('../../server/utils/cookies');
   vi.stubGlobal('setPreviewAuthToken', freshCookies.setPreviewAuthToken);
   vi.stubGlobal('setSpoofedByCookie', freshCookies.setSpoofedByCookie);
+  vi.stubGlobal('clearCartCookie', freshCookies.clearCartCookie);
+  vi.stubGlobal('setCartCookie', freshCookies.setCartCookie);
+  vi.stubGlobal('getCartCookie', freshCookies.getCartCookie);
 
   const mod = await import('../../server/api/auth/login-as.get');
   return mod.default;
@@ -141,16 +151,132 @@ describe('spoofed-by cookie helpers', () => {
 describe('login-as endpoint', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  describe("the customer's cart, as at a normal sign-in", () => {
+    const SID_CLAIM =
+      'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/sid';
+    const CUSTOMER = 'customer-sid';
+    const customerToken = () =>
+      fakeJwt({ SpoofedBy: 'admin@geins.io', [SID_CLAIM]: CUSTOMER });
+
+    /** The browser's request cookies for this case. */
+    function browserHolds(cookies: Record<string, string>) {
+      getCookieMock.mockImplementation(
+        (_event: unknown, name: string) => cookies[name],
+      );
+    }
+
+    async function logInAs(loginToken: string) {
+      getQueryMock.mockReturnValue({ loginToken });
+      const handler = await importHandler();
+      await handler(mockEvent);
+    }
+
+    function setTo(name: string): unknown[] {
+      return setCookieMock.mock.calls
+        .filter((call) => call[1] === name)
+        .map((call) => call[2]);
+    }
+
+    function deletedCartId(): boolean {
+      return deleteCookieMock.mock.calls.some((call) => call[1] === 'cart_id');
+    }
+
+    afterEach(() => {
+      getCookieMock.mockReset();
+      mockCopyCart.mockReset();
+    });
+
+    it('gives the customer their noted cart, moved to the front, and drops the guest cart unmerged', async () => {
+      browserHolds({
+        cart_id: 'guest-cart',
+        cart_owner: `other-sid|cart-o,${CUSTOMER}|cart-c`,
+      });
+
+      await logInAs(customerToken());
+
+      expect(mockCopyCart).not.toHaveBeenCalled();
+      expect(setTo('cart_id')).toEqual(['cart-c']);
+      expect(setTo('cart_owner')).toEqual([
+        `${CUSTOMER}|cart-c,other-sid|cart-o`,
+      ]);
+    });
+
+    it("copies a guest cart with the login token, and notes the copy as the customer's", async () => {
+      browserHolds({ cart_id: 'guest-cart', cart_owner: 'other-sid|cart-o' });
+      mockCopyCart.mockResolvedValue({ id: 'copied-cart' });
+      const token = customerToken();
+
+      await logInAs(token);
+
+      expect(mockCopyCart).toHaveBeenCalledWith('guest-cart', mockEvent, token);
+      expect(setTo('cart_id')).toEqual(['copied-cart']);
+      expect(setTo('cart_owner')).toEqual([
+        `${CUSTOMER}|copied-cart,other-sid|cart-o`,
+      ]);
+    });
+
+    it('gives a new cart when Geins refuses the copy, and leaves the note as it was', async () => {
+      const { createAppError, ErrorCode } = await vi.importActual<
+        typeof import('../../server/utils/errors')
+      >('../../server/utils/errors');
+      browserHolds({ cart_id: 'guest-cart', cart_owner: 'other-sid|cart-o' });
+      mockCopyCart.mockRejectedValue(createAppError(ErrorCode.CART_NOT_OWN));
+
+      await logInAs(customerToken());
+
+      expect(deletedCartId()).toBe(true);
+      expect(setTo('cart_id')).toEqual([]);
+      expect(setTo('cart_owner')).toEqual([]);
+    });
+
+    it('keeps the cart as it was when the copy fails for any other reason', async () => {
+      const { createExternalApiError } = await vi.importActual<
+        typeof import('../../server/utils/errors')
+      >('../../server/utils/errors');
+      browserHolds({ cart_id: 'guest-cart' });
+      mockCopyCart.mockRejectedValue(
+        createExternalApiError('cart', new Error('502 Bad Gateway')),
+      );
+
+      await logInAs(customerToken());
+
+      expect(deletedCartId()).toBe(false);
+      expect(setTo('cart_id')).toEqual([]);
+    });
+
+    it("gives no cart, and never copies or touches it, when the browser holds another buyer's noted cart", async () => {
+      browserHolds({ cart_id: 'cart-o', cart_owner: 'other-sid|cart-o' });
+
+      await logInAs(customerToken());
+
+      expect(mockCopyCart).not.toHaveBeenCalled();
+      expect(deletedCartId()).toBe(true);
+      expect(setTo('cart_owner')).toEqual([]);
+    });
+
+    it('copies as at sign-in, and notes nothing, for a token without a sid', async () => {
+      browserHolds({ cart_id: 'guest-cart' });
+      mockCopyCart.mockResolvedValue({ id: 'copied-cart' });
+
+      await logInAs(fakeJwt({ SpoofedBy: 'admin@geins.io', MemberId: '2' }));
+
+      expect(setTo('cart_id')).toEqual(['copied-cart']);
+      expect(setTo('cart_owner')).toEqual([]);
+    });
+  });
+
   it('throws BAD_REQUEST when loginToken is missing', async () => {
     getQueryMock.mockReturnValue({});
     const handler = await importHandler();
-    expect(() => handler(mockEvent)).toThrow('Missing loginToken');
+    await expect(handler(mockEvent)).rejects.toThrow('Missing loginToken');
   });
 
   it('throws BAD_REQUEST when loginToken is not a valid JWT format', async () => {
     getQueryMock.mockReturnValue({ loginToken: 'not-a-jwt' });
     const handler = await importHandler();
-    expect(() => handler(mockEvent)).toThrow('Invalid loginToken format');
+    await expect(handler(mockEvent)).rejects.toThrow(
+      'Invalid loginToken format',
+    );
   });
 
   it('sets auth cookie and spoofed-by cookie for impersonation token', async () => {
@@ -161,7 +287,7 @@ describe('login-as endpoint', () => {
     getQueryMock.mockReturnValue({ loginToken: token });
 
     const handler = await importHandler();
-    handler(mockEvent);
+    await handler(mockEvent);
 
     // Should set auth_token cookie
     expect(setCookieMock).toHaveBeenCalledWith(
@@ -187,7 +313,7 @@ describe('login-as endpoint', () => {
     getQueryMock.mockReturnValue({ loginToken: token });
 
     const handler = await importHandler();
-    handler(mockEvent);
+    await handler(mockEvent);
 
     // Should set auth_token
     expect(setCookieMock).toHaveBeenCalledWith(
@@ -204,12 +330,49 @@ describe('login-as endpoint', () => {
     expect(spoofedCalls).toHaveLength(0);
   });
 
+  it("drops the browser's cart, so the customer never lands on another buyer's cart, and keeps the owner note", async () => {
+    getQueryMock.mockReturnValue({
+      loginToken: fakeJwt({ SpoofedBy: 'admin@geins.io' }),
+    });
+
+    const handler = await importHandler();
+    await handler(mockEvent);
+
+    expect(deleteCookieMock).toHaveBeenCalledWith(mockEvent, 'cart_id', {
+      path: '/',
+    });
+    expect(deleteCookieMock).not.toHaveBeenCalledWith(
+      mockEvent,
+      'cart_owner',
+      expect.anything(),
+    );
+  });
+
+  it("leaves the buyers' noted carts as they were", async () => {
+    getQueryMock.mockReturnValue({
+      loginToken: fakeJwt({ SpoofedBy: 'admin@geins.io' }),
+    });
+    getCookieMock.mockImplementation((_event: unknown, name: string) =>
+      name === 'cart_owner' ? 'buyer-a|cart-a,buyer-b|cart-b' : undefined,
+    );
+
+    const handler = await importHandler();
+    await handler(mockEvent);
+
+    const touched = [
+      ...setCookieMock.mock.calls,
+      ...deleteCookieMock.mock.calls,
+    ].map((call) => call[1]);
+    expect(touched).not.toContain('cart_owner');
+    getCookieMock.mockReset();
+  });
+
   it('redirects to /portal by default', async () => {
     const token = fakeJwt({ exp: Math.floor(Date.now() / 1000) + 3600 });
     getQueryMock.mockReturnValue({ loginToken: token });
 
     const handler = await importHandler();
-    handler(mockEvent);
+    await handler(mockEvent);
 
     expect(sendRedirectMock).toHaveBeenCalledWith(mockEvent, '/portal', 302);
   });
@@ -222,7 +385,7 @@ describe('login-as endpoint', () => {
     });
 
     const handler = await importHandler();
-    handler(mockEvent);
+    await handler(mockEvent);
 
     expect(sendRedirectMock).toHaveBeenCalledWith(mockEvent, '/dashboard', 302);
   });
@@ -235,7 +398,7 @@ describe('login-as endpoint', () => {
     });
 
     const handler = await importHandler();
-    handler(mockEvent);
+    await handler(mockEvent);
 
     expect(sendRedirectMock).toHaveBeenCalledWith(mockEvent, '/portal', 302);
   });
@@ -250,7 +413,7 @@ describe('login-as endpoint', () => {
     });
 
     const handler = await importHandler();
-    handler(mockEvent);
+    await handler(mockEvent);
 
     expect(sendRedirectMock).toHaveBeenCalledWith(mockEvent, '/portal', 302);
   });
@@ -264,7 +427,7 @@ describe('login-as endpoint', () => {
     });
 
     const handler = await importHandler();
-    handler(mockEvent);
+    await handler(mockEvent);
 
     expect(sendRedirectMock).toHaveBeenCalledWith(mockEvent, '/portal', 302);
   });

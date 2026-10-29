@@ -1,4 +1,5 @@
 import { isSafeInternalPath } from '#shared/utils/redirect';
+import { settleSignInCart } from '../../utils/sign-in-cart';
 
 /**
  * Login-as-customer — admin impersonation entry point.
@@ -9,10 +10,11 @@ import { isSafeInternalPath } from '#shared/utils/redirect';
  * The account page redirects here. This endpoint:
  * 1. Validates the JWT format (not crypto — Geins signs it)
  * 2. Sets the auth token cookie
- * 3. If SpoofedBy claim is present, sets the impersonation cookie
- * 4. Redirects to /portal (or a custom redirect path)
+ * 3. Gives the customer their cart, as a normal sign-in does
+ * 4. If SpoofedBy claim is present, sets the impersonation cookie
+ * 5. Redirects to /portal (or a custom redirect path)
  */
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const loginToken = query.loginToken as string | undefined;
 
@@ -31,6 +33,8 @@ export default defineEventHandler((event) => {
 
   // Set the auth token cookie (same approach as preview-enter)
   setPreviewAuthToken(event, loginToken);
+
+  await settleSignInCart(event, loginToken);
 
   // If this is an admin impersonation, set the spoofed-by cookie
   if (spoofedBy) {
