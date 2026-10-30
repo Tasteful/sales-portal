@@ -15,12 +15,17 @@ Multi-tenant storefront application built on Nuxt 4. Serves multiple merchants/b
 
 ### Prerequisites
 
-- Node.js 24 (`.nvmrc`)
-- PNPM 9+
+- Node.js 24 (`.nvmrc`; `package.json` accepts `^24.15.0`), which ships corepack. A version manager
+  that reads `.nvmrc` switches to it for you: [fnm](https://github.com/Schniz/fnm) (macOS, Linux,
+  Windows) with `fnm use`, or [nvm](https://github.com/nvm-sh/nvm) (macOS, Linux) with `nvm use`.
+  Nothing enforces the version: pnpm only warns when Node is outside the range.
+- pnpm through corepack: the version is pinned by `packageManager` in `package.json`, so don't install
+  pnpm globally
 
 ### Setup
 
 ```bash
+corepack enable       # once per machine: provides pnpm at the pinned version
 pnpm install
 cp .env.example .env   # Configure environment variables
 pnpm dev               # http://localhost:3000
