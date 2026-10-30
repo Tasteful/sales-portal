@@ -11,7 +11,8 @@ repository root.** That file is the source of truth for the flow; this page does
 ### Prerequisites
 
 - Node.js 24, the version in `.nvmrc` — it guards only if your shell switches to it (`nvm use`, or automatic switching)
-- PNPM 9+
+- pnpm through corepack (ships with Node.js 24): run `corepack enable` once per machine. The version is
+  pinned by `packageManager` in `package.json`; don't install pnpm globally
 - Git
 - GitHub CLI (`gh`) — optional; used by the AI agent instructions in `AGENTS.md`
 

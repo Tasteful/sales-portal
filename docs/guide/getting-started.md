@@ -7,13 +7,15 @@ This guide will help you set up the Sales Portal development environment and get
 Before you begin, ensure you have the following installed:
 
 - **Node.js 24** — the version in `.nvmrc`, which CI and the container image run too
-- **PNPM 9+** — Package manager (recommended to match `pnpm-lock.yaml`)
+- **pnpm** — through corepack, which ships with Node.js 24. The version is pinned by
+  `packageManager` in `package.json`; corepack downloads exactly that version, so don't install
+  pnpm globally
 - **GitHub CLI (`gh`)** — Optional. Not needed to run, build or test the app. The AI agent
   instructions in `AGENTS.md` use it for pull request and workflow operations, so those
   steps fail silently without it.
 
 ::: tip
-You can check your Node.js version with `node --version` and install PNPM with `npm install -g pnpm`. Install the GitHub CLI with `brew install gh` (macOS) or see
+You can check your Node.js version with `node --version`. Run `corepack enable` once per machine to put the corepack `pnpm` command on your `PATH` (on Windows from an elevated prompt, or with `--install-directory` pointing at a folder you own that is on `PATH`); `pnpm --version` inside the repository then prints the pinned version. Install the GitHub CLI with `brew install gh` (macOS) or see
 [cli.github.com](https://cli.github.com), then authenticate with `gh auth login`.
 :::
 
@@ -29,6 +31,7 @@ cd sales-portal
 ### 2. Install Dependencies
 
 ```bash
+corepack enable   # once per machine
 pnpm install
 ```
 
