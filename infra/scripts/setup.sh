@@ -242,7 +242,7 @@ print_github_secrets() {
     echo "│ Variable Name           │ Default Value                                 │"
     echo "├─────────────────────────┼───────────────────────────────────────────────┤"
     printf "│ %-23s │ %-45s │\n" "GEINS_API_ENDPOINT" "https://api.geins.io/graphql"
-    printf "│ %-23s │ %-45s │\n" "STORAGE_DRIVER" "fs"
+    printf "│ %-23s │ %-45s │\n" "STORAGE_DRIVER" "(empty = memory; redis for Redis)"
     printf "│ %-23s │ %-45s │\n" "ENABLE_ANALYTICS" "false"
     printf "│ %-23s │ %-45s │\n" "LOG_LEVEL" "info"
     echo "└─────────────────────────┴───────────────────────────────────────────────┘"

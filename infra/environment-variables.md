@@ -37,14 +37,15 @@ These are **sensitive values** that must be kept secret. They are encrypted by G
 | `AZURE_CLIENT_ID`       |    ✅    | Service Principal App (Client) ID           | Run `pnpm infra:setup`          |
 | `AZURE_TENANT_ID`       |    ✅    | Azure AD Tenant ID                          | Run `pnpm infra:setup`          |
 | `AZURE_SUBSCRIPTION_ID` |    ✅    | Target Azure Subscription ID                | Run `pnpm infra:setup`          |
-| `REDIS_URL`             |    ❌    | Redis/Upstash connection string             | Your Redis provider             |
+| `REDIS_URL`             |    ❌    | Redis/Upstash connection URL                | Your Redis provider             |
 | `SENTRY_DSN`            |    ❌    | Sentry DSN for error tracking (server-only) | Sentry → Project → Client Keys  |
 | `SENTRY_AUTH_TOKEN`     |    ❌    | Sentry token for source map uploads         | Sentry → Settings → Auth Tokens |
 
 ### Notes on Secrets
 
 - **AZURE\_\*** secrets are created by running `pnpm infra:setup` - the script outputs the values
-- **REDIS_URL** is only needed if using Redis for storage (production)
+- **REDIS_URL** is only used with `STORAGE_DRIVER=redis`: a `redis://` or `rediss://` URL. With
+  `redis` and no URL, KV storage stays in memory
 - **SENTRY_AUTH_TOKEN** is only used at **build time** for uploading source maps
 
 ---
@@ -59,7 +60,7 @@ These are **non-sensitive configuration values** visible in the repository setti
 | ------------------------------- | ------------------------------ | ------------------------------------------ | ------------------------------------------ |
 | `GEINS_API_ENDPOINT`            | `https://api.geins.io/graphql` | Geins GraphQL API URL                      | Any valid URL                              |
 | `GEINS_TENANT_API_URL`          | _(empty)_                      | Geins Tenant API URL (server-only)         | Any valid URL                              |
-| `STORAGE_DRIVER`                | `fs`                           | Storage backend for tenant config          | `memory`, `fs`, `redis`                    |
+| `STORAGE_DRIVER`                | _(empty)_ = in memory          | Backend for KV storage (tenant config)     | `redis` (anything else: in memory)         |
 | `ENABLE_ANALYTICS`              | `false`                        | Enable client-side analytics               | `true`, `false`                            |
 | `CONFIGURATOR_BACKEND`          | _(empty)_ = `merchant-api`     | Test override for the configurator backend | `fixture` (CI e2e only), `merchant-api`    |
 | `CONFIGURATOR_MERCHANT_API_URL` | _(empty)_                      | Merchant-api URL the CPQ area is served on | Any valid URL; empty adds no app setting   |
@@ -190,7 +191,7 @@ You can set different values per GitHub Environment (dev, staging, prod):
 
 | Environment | `REDIS_URL` | `SENTRY_DSN` | Notes                         |
 | ----------- | :---------: | :----------: | ----------------------------- |
-| dev         |     ❌      |   Optional   | Uses memory/fs storage        |
+| dev         |     ❌      |   Optional   | In-memory KV storage          |
 | staging     |     ✅      |      ✅      | Production-like (server-only) |
 | prod        |     ✅      |      ✅      | Full monitoring (server-only) |
 

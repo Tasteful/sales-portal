@@ -32,9 +32,9 @@ export interface RateLimitResult {
  * KV-backed rate limiter for protecting endpoints from abuse.
  *
  * Uses a sliding window approach to track requests per IP address.
- * Backed by Nitro's `useStorage('kv')`, currently a per-process memory store,
- * so limits apply per instance. Sharing them across instances requires a
- * shared storage driver, which `nitro.storage` configures at build time.
+ * Backed by Nitro's `useStorage('kv')`: per-process memory by default, so
+ * limits apply per instance; shared across instances when `kv` is on Redis
+ * (`NUXT_STORAGE_DRIVER=redis`, see server/plugins/00.storage.ts).
  */
 export class RateLimiter {
   private readonly limit: number;

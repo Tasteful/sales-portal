@@ -91,7 +91,7 @@ Key environment variables:
 | -------------------- | ----------------------------------------------- | ------------------------------ |
 | `NODE_ENV`           | Environment mode                                | `development`                  |
 | `GEINS_API_ENDPOINT` | Geins GraphQL endpoint                          | `https://api.geins.io/graphql` |
-| `STORAGE_DRIVER`     | KV storage driver                               | `fs`                           |
+| `STORAGE_DRIVER`     | KV storage: `redis`, else in memory             | `memory`                       |
 | `LOG_LEVEL`          | Logging verbosity (`silent` to disable logging) | `info`                         |
 
 See [Environment Variables](/architecture#environment-variables) for the full list.

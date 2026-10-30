@@ -103,7 +103,9 @@ See [`.env.example`](.env.example) for all available configuration. Key variable
 | ------------------------------ | ---------------------------------- | ---------- |
 | `NUXT_GEINS_API_ENDPOINT`      | Geins GraphQL endpoint             | (see file) |
 | `NUXT_GEINS_TENANT_API_URL`    | Geins Tenant API URL               | (see file) |
-| `NUXT_STORAGE_DRIVER`          | KV storage (`memory`/`fs`/`redis`) | `memory`   |
+| `NUXT_STORAGE_DRIVER`          | `redis` or in-memory KV storage    | `memory`   |
+| `NUXT_STORAGE_REDIS_URL`       | Redis connection: URL or Sentinels | —          |
+| `NUXT_STORAGE_REDIS_PASSWORD`  | Redis password (Litium Cloud)      | —          |
 | `NUXT_HEALTH_CHECK_SECRET`     | Secret for detailed `/api/health`  | —          |
 | `NUXT_HEALTH_RSS_DEGRADED_MB`  | RSS above this is `degraded`       | `500`      |
 | `NUXT_HEALTH_RSS_UNHEALTHY_MB` | RSS above this is `unhealthy`      | `1200`     |

@@ -127,6 +127,7 @@ Body:
   In Litium Cloud the edge sets the header and its first entry is used
 - Requires coordination with Geins to configure the shared secret
 - Single shared secret (not per-tenant) — compromise means all tenants are affected
-- Rate limiter uses KV storage (`useStorage('kv')`), currently a per-process memory store, so
-  limits apply per instance; sharing them across instances requires a shared storage driver
+- Rate limiter uses KV storage (`useStorage('kv')`): a per-process memory store by default, so
+  limits apply per instance, and shared across instances when `kv` is on Redis
+  (`NUXT_STORAGE_DRIVER=redis`)
 - Dedup storage grows over time (consider TTL-based cleanup in future)

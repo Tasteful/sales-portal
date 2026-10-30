@@ -93,8 +93,10 @@ See `nuxt.config.ts` for the full runtime config. Key values:
   production heap cap
 - `geins.apiEndpoint` - Geins API endpoint
 - `geins.tenantApiUrl` - Tenant settings API
-- `storage.driver` - Storage driver (memory/redis)
-- `storage.redisUrl` - Redis connection URL
+- `storage.driver` - KV storage driver: `redis` mounts Redis at startup, anything else stays in memory
+- `storage.redisUrl` - Redis connection: a `redis://`/`rediss://` URL or the Litium Cloud
+  Sentinel string (`host:26379,host:26379,serviceName=mymaster`)
+- `storage.redisPassword` - Redis password when it is not in the connection string
 - `sentry.dsn` - Sentry error tracking DSN
 - `logging.verboseRequests` - Enable verbose request logging (includes headers)
 

@@ -97,14 +97,17 @@ async function getEnvironment(event: H3Event): Promise<string> {
 /**
  * Check storage connectivity (KV store)
  *
- * Note: Storage check is optional - if using filesystem storage in production
- * without a configured directory, we report as 'degraded' rather than 'unhealthy'
- * since the app can function without KV storage for many use cases.
+ * Reports the driver actually mounted on `kv` (`memory` or `redis`), not the
+ * configured one: `NUXT_STORAGE_DRIVER=redis` without a connection string
+ * stays in memory (see server/plugins/00.storage.ts).
+ *
+ * Note: Storage check is optional - a failing store reports 'degraded' rather
+ * than 'unhealthy' since the app can function without KV storage for many use
+ * cases.
  */
-async function checkStorage(event: H3Event): Promise<ComponentHealth> {
+async function checkStorage(): Promise<ComponentHealth> {
   const timer = createTimer();
-  const config = useRuntimeConfig(event);
-  const storageDriver = config.storage?.driver || 'fs';
+  const storageDriver = useStorage().getMount('kv').driver.name ?? 'unknown';
 
   try {
     const storage = useStorage('kv');
@@ -273,7 +276,7 @@ export default defineEventHandler(
     const [storageHealth, memoryHealth] = await Promise.all([
       quickMode
         ? Promise.resolve({ status: 'healthy' as const })
-        : checkStorage(event),
+        : checkStorage(),
       Promise.resolve(checkMemory(event)),
     ]);
 

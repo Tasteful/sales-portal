@@ -223,7 +223,7 @@ These secrets can be configured per GitHub Environment if needed:
 | ------------------------------- | ------------------------------------------------------------ | ------------------------------ |
 | `GEINS_API_ENDPOINT`            | Geins GraphQL API endpoint                                   | `https://api.geins.io/graphql` |
 | `GEINS_TENANT_API_URL`          | Geins Tenant API URL (server-only)                           | (empty)                        |
-| `STORAGE_DRIVER`                | Storage driver (`fs` or `redis`)                             | `fs`                           |
+| `STORAGE_DRIVER`                | `redis`, or anything else for in-memory KV storage           | (empty = in memory)            |
 | `ENABLE_ANALYTICS`              | Enable analytics                                             | `false`                        |
 | `CONFIGURATOR_BACKEND`          | Test override for the configurator backend                   | (empty = `merchant-api`)       |
 | `CONFIGURATOR_MERCHANT_API_URL` | Merchant-api URL for the CPQ area; unset adds no app setting | (empty)                        |

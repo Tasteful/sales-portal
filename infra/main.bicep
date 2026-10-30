@@ -43,7 +43,7 @@ param geinsTenantApiUrl string = ''
 @secure()
 param healthCheckSecret string = ''
 
-@description('Storage driver (memory, fs, or redis)')
+@description('KV storage driver: redis, or anything else for in-memory')
 param storageDriver string = ''
 
 @description('Redis URL for production storage')

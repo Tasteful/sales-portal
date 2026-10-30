@@ -489,24 +489,35 @@ The `server/api/external/[...].ts` handler proxies requests to external APIs wit
 
 See [`.env.example`](https://github.com/geins-io/sales-portal/blob/main/.env.example) for the full list. Key variables:
 
-| Variable                         | Description                                                                                                                | Default                                |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| `NUXT_GEINS_API_ENDPOINT`        | Geins GraphQL endpoint                                                                                                     | `https://merchantapi.geins.io/graphql` |
-| `NUXT_GEINS_TENANT_API_URL`      | Geins Tenant API URL (server-only)                                                                                         | —                                      |
-| `NUXT_STORAGE_DRIVER`            | KV storage driver (`memory`/`fs`/`redis`)                                                                                  | `memory`                               |
-| `NUXT_STORAGE_REDIS_URL`         | Redis connection URL                                                                                                       | —                                      |
-| `NUXT_HEALTH_CHECK_SECRET`       | Secret for detailed `/api/health` metrics                                                                                  | —                                      |
-| `NUXT_HEALTH_RSS_DEGRADED_MB`    | RSS above this reports `degraded`                                                                                          | `500`                                  |
-| `NUXT_HEALTH_RSS_UNHEALTHY_MB`   | RSS above this reports `unhealthy` (503)                                                                                   | `1200`                                 |
-| `NUXT_WEBHOOK_SECRET`            | Webhook signature verification secret                                                                                      | —                                      |
-| `NUXT_SENTRY_DSN`                | Sentry DSN (server-only)                                                                                                   | —                                      |
-| `LOG_LEVEL`                      | Logging verbosity (`debug`/`info`/`warn`/`error`/`silent`)                                                                 | `info`                                 |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`    | Server logs (logger and `console.*`) go over OTLP/HTTP to `<endpoint>/v1/logs` instead of the console                      | —                                      |
-| `OTEL_LOGS_EXPORTER`             | `none` keeps logs on the console while an OTLP endpoint is set                                                             | —                                      |
-| `NUXT_PUBLIC_FEATURES_ANALYTICS` | Enable analytics scripts                                                                                                   | `false`                                |
-| `RUNNING_IN_LITIUM_CLOUD`        | `true` behind the Litium Cloud edge: host from `X-Forwarded-Host`, https, client IP from the first `X-Forwarded-For` entry | —                                      |
-| `LITIUMCLOUD_HEALTH_TOKEN`       | In Litium Cloud, the `x-api-key` that unlocks the detailed `/api/health` instead of `NUXT_HEALTH_CHECK_SECRET`             | —                                      |
-| `TENANT_LOOKUP_HOSTNAME`         | Testing aid: every request looks its tenant up by this hostname, whatever host it arrived on                               | —                                      |
+| Variable                         | Description                                                | Default                                |
+| -------------------------------- | ---------------------------------------------------------- | -------------------------------------- |
+| `NUXT_GEINS_API_ENDPOINT`        | Geins GraphQL endpoint                                     | `https://merchantapi.geins.io/graphql` |
+| `NUXT_GEINS_TENANT_API_URL`      | Geins Tenant API URL (server-only)                         | —                                      |
+| `NUXT_STORAGE_DRIVER`            | KV storage: `redis`, anything else keeps it in memory      | `memory`                               |
+| `NUXT_STORAGE_REDIS_URL`         | Redis URL or Litium Cloud Sentinel string (see below)      | —                                      |
+| `NUXT_STORAGE_REDIS_PASSWORD`    | Redis password when not in the connection string           | —                                      |
+| `NUXT_HEALTH_CHECK_SECRET`       | Secret for detailed `/api/health` metrics                  | —                                      |
+| `NUXT_HEALTH_RSS_DEGRADED_MB`    | RSS above this reports `degraded`                          | `500`                                  |
+| `NUXT_HEALTH_RSS_UNHEALTHY_MB`   | RSS above this reports `unhealthy` (503)                   | `1200`                                 |
+| `NUXT_WEBHOOK_SECRET`            | Webhook signature verification secret                      | —                                      |
+| `NUXT_SENTRY_DSN`                | Sentry DSN (server-only)                                   | —                                      |
+| `LOG_LEVEL`                      | Logging verbosity (`debug`/`info`/`warn`/`error`/`silent`) | `info`                                 |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`    | Sends server logs over OTLP instead of the console         | —                                      |
+| `OTEL_LOGS_EXPORTER`             | `none` keeps logs on the console with an endpoint set      | —                                      |
+| `NUXT_PUBLIC_FEATURES_ANALYTICS` | Enable analytics scripts                                   | `false`                                |
+| `RUNNING_IN_LITIUM_CLOUD`        | `true` behind the Litium Cloud edge (see below)            | —                                      |
+| `LITIUMCLOUD_HEALTH_TOKEN`       | Litium Cloud probe key for the detailed `/api/health`      | —                                      |
+| `TENANT_LOOKUP_HOSTNAME`         | Testing aid: look every request up as this hostname        | —                                      |
+
+- `NUXT_STORAGE_DRIVER=redis` mounts `kv` on Redis at startup, keys prefixed `sales-portal:`.
+  `NUXT_STORAGE_REDIS_URL` is a `redis://`/`rediss://` URL (Azure) or the Sentinel string Litium
+  Cloud injects, `host:26379,host:26379,serviceName=mymaster`, with the password in
+  `NUXT_STORAGE_REDIS_PASSWORD`. Without a connection string `kv` stays in memory, per instance.
+- `RUNNING_IN_LITIUM_CLOUD=true`: the host comes from `X-Forwarded-Host`, every request counts as
+  https, and the client IP is the first `X-Forwarded-For` entry.
+- `LITIUMCLOUD_HEALTH_TOKEN` is the `x-api-key` the Litium Cloud probes send; it replaces
+  `NUXT_HEALTH_CHECK_SECRET` there.
+- `OTEL_EXPORTER_OTLP_ENDPOINT`: see [OTLP Log Export](#otlp-log-export-litium-cloud).
 
 ### Runtime Configuration
 
@@ -990,7 +1001,7 @@ Pre-configured rate limiters in `server/utils/rate-limiter.ts`:
 - Token refresh: 10 requests/min per IP
 - Error batch: 10 requests/min per IP
 
-Rate limiter uses `useStorage('kv')` — scales to Redis in production.
+Rate limiter uses `useStorage('kv')`, shared across instances when `kv` is on Redis (`NUXT_STORAGE_DRIVER=redis`).
 
 ### Tenant CSS Sanitization
 

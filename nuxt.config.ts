@@ -255,6 +255,7 @@ export default defineNuxtConfig({
    * │ NUXT_GEINS_TENANT_API_URL       │ SENTRY_ORG                           │
    * │ NUXT_STORAGE_DRIVER             │ SENTRY_PROJECT                       │
    * │ NUXT_STORAGE_REDIS_URL          │                                      │
+   * │ NUXT_STORAGE_REDIS_PASSWORD     │                                      │
    * │ NUXT_HEALTH_CHECK_SECRET        │                                      │
    * │ NUXT_EXTERNAL_API_BASE_URL      │                                      │
    * │ NUXT_SENTRY_DSN                 │                                      │
@@ -280,11 +281,17 @@ export default defineNuxtConfig({
       tenantApiUrl: 'https://merchantapi.geins.io/store-settings',
     },
 
-    // Storage configuration (memory for dev, redis for production)
-    // Azure: NUXT_STORAGE_DRIVER=redis, NUXT_STORAGE_REDIS_URL=redis://...
+    // KV storage (`useStorage('kv')`): tenant configs, rate limits, webhook dedup.
+    // `redis` with a connection string mounts Redis at startup
+    // (server/plugins/00.storage.ts); anything else keeps it in memory.
+    // redisUrl: a redis:// or rediss:// URL (Azure), or the .NET format Litium
+    // Cloud injects, `host:26379,host:26379,serviceName=mymaster` (Sentinel).
+    // redisPassword: Litium Cloud's separately injected password.
+    // Azure: NUXT_STORAGE_DRIVER=redis, NUXT_STORAGE_REDIS_URL=rediss://...
     storage: {
       driver: 'memory',
       redisUrl: '',
+      redisPassword: '',
     },
 
     // Proxies in front of the app that append to X-Forwarded-For; rate limits
@@ -385,9 +392,9 @@ export default defineNuxtConfig({
 
   nitro: {
     storage: {
-      kv: {
-        driver: 'memory',
-      },
+      // No build-time `kv` mount: without one it lives on the root memory
+      // driver, and server/plugins/00.storage.ts mounts Redis there at
+      // runtime when configured.
       [RESOLVE_URL_CACHE_BASE]: resolveUrlCacheMount,
     },
     // Enable compression
