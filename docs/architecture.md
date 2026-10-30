@@ -501,6 +501,8 @@ See [`.env.example`](https://github.com/geins-io/sales-portal/blob/main/.env.exa
 | `NUXT_WEBHOOK_SECRET`            | Webhook signature verification secret                                                                                      | —                                      |
 | `NUXT_SENTRY_DSN`                | Sentry DSN (server-only)                                                                                                   | —                                      |
 | `LOG_LEVEL`                      | Logging verbosity (`debug`/`info`/`warn`/`error`/`silent`)                                                                 | `info`                                 |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`    | Server logs (logger and `console.*`) go over OTLP/HTTP to `<endpoint>/v1/logs` instead of the console                      | —                                      |
+| `OTEL_LOGS_EXPORTER`             | `none` keeps logs on the console while an OTLP endpoint is set                                                             | —                                      |
 | `NUXT_PUBLIC_FEATURES_ANALYTICS` | Enable analytics scripts                                                                                                   | `false`                                |
 | `RUNNING_IN_LITIUM_CLOUD`        | `true` behind the Litium Cloud edge: host from `X-Forwarded-Host`, https, client IP from the first `X-Forwarded-For` entry | —                                      |
 | `LITIUMCLOUD_HEALTH_TOKEN`       | In Litium Cloud, the `x-api-key` that unlocks the detailed `/api/health` instead of `NUXT_HEALTH_CHECK_SECRET`             | —                                      |
@@ -789,6 +791,21 @@ Configure via environment variables:
 - `APPLICATIONINSIGHTS_CONNECTION_STRING`: Connection string from Azure
 - `APPINSIGHTS_INSTRUMENTATIONKEY`: Instrumentation key (legacy)
 - `LOG_LEVEL`: Minimum log level (debug, info, warn, error, silent)
+
+### OTLP Log Export (Litium Cloud)
+
+When `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`) is set, as the Litium Cloud
+collector sidecar does with `http://localhost:4318`, server logs are sent as OTLP/HTTP (JSON) and no longer
+printed (`server/utils/otel-logs.ts`):
+
+- `logger.ts` lines use the instrumentation scope `app`. Context keys become attributes unchanged; the error
+  becomes `exception.type`/`exception.message`/`exception.stacktrace`; metrics become `metrics.<name>`.
+  `LOG_LEVEL` still filters first.
+- `server/plugins/00.otel-logs.ts` forwards every `console.*` call, ours and our dependencies', under the scope
+  `console`. Direct writes to `process.stdout`/`stderr` still reach the container console.
+- On shutdown (SIGTERM/SIGINT) the console is restored and pending records are flushed.
+- `OTEL_LOGS_EXPORTER=none` keeps the console output while an endpoint is set. Without an endpoint nothing
+  changes.
 
 ---
 

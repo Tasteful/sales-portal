@@ -7,9 +7,17 @@
  *
  * In production, logs are formatted as JSON for easy parsing by
  * Azure Application Insights and other log aggregation systems.
+ * When an OTLP endpoint is configured (see `otel-logs.ts`), logs are
+ * sent over OTLP instead of being printed.
  */
 
 import { randomUUID } from 'crypto';
+import {
+  SeverityNumber,
+  type LogAttributes,
+  type LogRecord,
+} from '@opentelemetry/api-logs';
+import { getOtelLogger } from './otel-logs';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'silent';
 
@@ -213,10 +221,72 @@ function createLogEntry(
   };
 }
 
+const OTEL_SEVERITY: Record<
+  Exclude<LogLevel, 'silent'>,
+  [SeverityNumber, string]
+> = {
+  debug: [SeverityNumber.DEBUG, 'DEBUG'],
+  info: [SeverityNumber.INFO, 'INFO'],
+  warn: [SeverityNumber.WARN, 'WARN'],
+  error: [SeverityNumber.ERROR, 'ERROR'],
+};
+
+/**
+ * Convert a log entry to an OTel log record. Context keys become attributes
+ * as is; the error uses the OTel `exception.*` semantic conventions.
+ */
+function toOtelLogRecord(entry: LogEntry): LogRecord {
+  const attributes: LogAttributes = {};
+
+  for (const [key, value] of Object.entries(entry.context ?? {})) {
+    if (value === undefined || value === null) continue;
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      attributes[key] = value;
+    } else if (value instanceof Error) {
+      attributes[key] = `${value.name}: ${value.message}`;
+    } else {
+      attributes[key] = safeStringify(value);
+    }
+  }
+
+  if (entry.error) {
+    attributes['exception.type'] = entry.error.name;
+    attributes['exception.message'] = entry.error.message;
+    if (entry.error.stack) {
+      attributes['exception.stacktrace'] = entry.error.stack;
+    }
+    if (entry.error.code) attributes['error.code'] = entry.error.code;
+  }
+
+  for (const [key, value] of Object.entries(entry.metrics ?? {})) {
+    attributes[`metrics.${key}`] = value;
+  }
+
+  const [severityNumber, severityText] =
+    OTEL_SEVERITY[entry.level as Exclude<LogLevel, 'silent'>];
+  return {
+    timestamp: new Date(entry.timestamp),
+    severityNumber,
+    severityText,
+    body: entry.message,
+    attributes,
+  };
+}
+
 /**
  * Output a log entry
  */
 function outputLog(entry: LogEntry): void {
+  const otel = getOtelLogger('app');
+  if (otel) {
+    otel.emit(toOtelLogRecord(entry));
+    return;
+  }
+
   const formatted = formatLogEntry(entry);
   switch (entry.level) {
     case 'error':
