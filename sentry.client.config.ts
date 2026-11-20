@@ -1,5 +1,5 @@
 /**
- * Sentry Client-Side Configuration
+ * Sentry Client-Side Configuration  
  *
  * This file initializes Sentry for browser-side error tracking,
  * performance monitoring, and session replay.
