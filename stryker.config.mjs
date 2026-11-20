@@ -13,3 +13,5 @@ export default {
   reporters: ['clear-text', 'progress', 'html'],
   tempDirName: '.stryker-tmp',
 };
+
+
